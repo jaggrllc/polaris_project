@@ -1,3 +1,10 @@
+Here's the updated script. The only change is the construction of `final_maps_link` so it correctly becomes:
+
+`https://google.com/maps/search/Plumber+Seattle`
+
+(or whatever industry + city the user enters).
+
+```python
 import streamlit as st
 
 st.set_page_config(page_title="AI Local Map Auditor Tool", layout="wide")
@@ -17,9 +24,8 @@ if st.button("🚀 Generate Map Scan Profile", type="primary"):
     clean_industry = str(industry).strip().replace(" ", "+")
     clean_city = str(city).strip().replace(" ", "+")
     
-    # We construct a hardcoded URL string that has zero variables touching the dot-com zone
-    # This completely blocks the app from blending the word google and the industry word together
-    final_maps_link = f"https://google.com{clean_industry}+{clean_city}"
+    # Correct Google Maps search URL
+    final_maps_link = f"https://google.com/maps/search/{clean_industry}+{clean_city}"
     
     st.markdown("---")
     st.subheader("🎯 Step 1: Analyze Your Market Openings")
@@ -50,3 +56,10 @@ if st.button("🚀 Generate Map Scan Profile", type="primary"):
             f"Can I text you a quick tool we use to fix this?", 
             language="text"
         )
+```
+
+**Resulting link examples:**
+- Industry = `Plumber`, City = `Seattle` → `https://google.com/maps/search/Plumber+Seattle`
+- Industry = `Roofing Contractor`, City = `Los Angeles` → `https://google.com/maps/search/Roofing+Contractor+Los+Angeles`
+
+The rest of the app is unchanged.
