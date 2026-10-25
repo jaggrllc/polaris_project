@@ -22,7 +22,6 @@ openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
 if "results_ready" not in st.session_state:
     st.session_state.results_ready = False
     st.session_state.df = None
-    st.session_state.local_results = None
     st.session_state.target_found = False
     st.session_state.target_position = None
     st.session_state.plan = ""
@@ -30,19 +29,20 @@ if "results_ready" not in st.session_state:
     st.session_state.target_lon = None
     st.session_state.target_address = ""
     st.session_state.target_phone = ""
+    st.session_state.auto_nap = ""
 
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. Joe's Pizza")
     keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaping")
-    business_address = st.text_input("Business Address (optional – for red pin)", placeholder="Full street address")
-    business_phone = st.text_input("Business Phone (optional – for NAP)", placeholder="e.g. (555) 123-4567")
+    business_address = st.text_input("Business Address (optional override)", placeholder="Leave blank to auto-fill from results")
+    business_phone = st.text_input("Business Phone (optional override)", placeholder="Leave blank to auto-fill from results")
 with col2:
     location_input = st.text_input("Search Location (city or address)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Search Center Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Search Center Longitude (optional)", value=0.0, format="%.6f")
-    biz_lat = st.number_input("Business Latitude (optional – for red pin)", value=0.0, format="%.6f")
-    biz_lon = st.number_input("Business Longitude (optional – for red pin)", value=0.0, format="%.6f")
+    biz_lat = st.number_input("Business Latitude (optional override)", value=0.0, format="%.6f")
+    biz_lon = st.number_input("Business Longitude (optional override)", value=0.0, format="%.6f")
 
 zoom = st.slider("Map Zoom (for SerpAPI ll)", 10, 18, 14)
 
@@ -86,12 +86,18 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     rows = []
                     target_lat = None
                     target_lon = None
-                    target_address = business_address
-                    target_phone = business_phone
+                    target_address = ""
+                    target_phone = ""
 
                     for item in local_results[:15]:
-                        gps = item.get("gps_coordinates", {})
-                        phone = item.get("phone") or item.get("phone_number") or ""
+                        gps = item.get("gps_coordinates", {}) or {}
+                        # Try multiple possible phone keys
+                        phone = (
+                            item.get("phone")
+                            or item.get("phone_number")
+                            or item.get("telephone")
+                            or ""
+                        )
                         rows.append({
                             "Position": item.get("position"),
                             "Title": item.get("title"),
@@ -104,31 +110,32 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Longitude": gps.get("longitude"),
                         })
 
-                        # Capture target business coordinates and NAP if found
+                        # Automatically capture target business data when name matches
                         if business_name.lower() in (str(item.get("title") or "")).lower():
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
-                            if not target_address:
-                                target_address = item.get("address", "")
-                            if not target_phone:
-                                target_phone = phone
+                            target_address = item.get("address") or ""
+                            target_phone = phone
 
-                    # Prefer user-supplied business coordinates if provided
+                    # User overrides take priority if supplied
                     if biz_lat != 0.0 and biz_lon != 0.0:
                         target_lat = biz_lat
                         target_lon = biz_lon
+                    if business_address.strip():
+                        target_address = business_address.strip()
+                    if business_phone.strip():
+                        target_phone = business_phone.strip()
 
                     df = pd.DataFrame(rows)
 
-                    target_found = any(
-                        business_name.lower() in (str(r.get("title") or "")).lower()
-                        for r in local_results
-                    )
+                    target_found = target_lat is not None
                     target_position = next(
                         (r.get("position") for r in local_results
                          if business_name.lower() in (str(r.get("title") or "")).lower()),
                         None
                     )
+
+                    auto_nap = f"Name: {business_name}\nAddress: {target_address or 'Not available'}\nPhone: {target_phone or 'Not available'}"
 
                     summary_text = df.to_string(index=False)
                     prompt = f"""You are a helpful local SEO assistant. Analyze these Google Maps / local results for the keyword "{keyword}" near "{location_input or f'{lat},{lon}'}".
@@ -154,9 +161,9 @@ Write a clear, practical action plan (5-8 bullet points) the business owner coul
                         )
                         plan = completion.choices[0].message.content
 
+                    # Save auto-captured data
                     st.session_state.results_ready = True
                     st.session_state.df = df
-                    st.session_state.local_results = local_results
                     st.session_state.target_found = target_found
                     st.session_state.target_position = target_position
                     st.session_state.plan = plan
@@ -164,6 +171,7 @@ Write a clear, practical action plan (5-8 bullet points) the business owner coul
                     st.session_state.target_lon = target_lon
                     st.session_state.target_address = target_address
                     st.session_state.target_phone = target_phone
+                    st.session_state.auto_nap = auto_nap
 
             except Exception as e:
                 st.error(f"Error during audit: {str(e)}")
@@ -173,11 +181,15 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
+    # Show auto-captured NAP
+    if st.session_state.target_lat and st.session_state.target_lon:
+        st.success("**Auto-captured NAP for target business:**")
+        st.code(st.session_state.auto_nap)
+
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or (st.session_state.target_lat and st.session_state.target_lon):
         st.subheader("Map of Top Results (Google Maps) — BIG RED PIN = Target Business")
 
-        # Center map on target if available, otherwise on results average
         if st.session_state.target_lat and st.session_state.target_lon:
             center_lat = st.session_state.target_lat
             center_lon = st.session_state.target_lon
@@ -197,28 +209,28 @@ if st.session_state.results_ready and st.session_state.df is not None:
             if business_name.lower() not in str(row["Title"]).lower():
                 folium.Marker(
                     location=[row["Latitude"], row["Longitude"]],
-                    popup=f"{row['Title']}<br>{row.get('Address','')}",
+                    popup=f"{row['Title']}<br>{row.get('Address','')}<br>{row.get('Phone','')}",
                     tooltip=row["Title"],
                     icon=folium.Icon(color="blue", icon="info-sign")
                 ).add_to(m)
 
-        # BIG RED PIN for target business + NAP
+        # BIG RED PIN with auto NAP
         if st.session_state.target_lat and st.session_state.target_lon:
             nap_html = f"""
-            <div style="font-family: Arial; font-size: 14px; width: 220px;">
-                <b style="color: red; font-size: 16px;">{business_name}</b><br>
+            <div style="font-family: Arial; font-size: 14px; width: 240px;">
+                <b style="color: red; font-size: 17px;">{business_name}</b><br><br>
                 <b>Address:</b> {st.session_state.target_address or 'Not available'}<br>
                 <b>Phone:</b> {st.session_state.target_phone or 'Not available'}
             </div>
             """
             folium.Marker(
                 location=[st.session_state.target_lat, st.session_state.target_lon],
-                popup=folium.Popup(nap_html, max_width=250),
+                popup=folium.Popup(nap_html, max_width=280),
                 tooltip=f"TARGET: {business_name}",
                 icon=folium.Icon(color="red", icon="map-marker", prefix="fa")
             ).add_to(m)
         else:
-            st.info("No coordinates available for the target business. Enter Business Latitude/Longitude (or ensure it appears in results) to place the BIG RED PIN.")
+            st.info("Target business not found in results. Enter Business Latitude/Longitude (optional override fields) to place the BIG RED PIN.")
 
         st_folium(m, width=800, height=500, returned_objects=[])
 
@@ -248,6 +260,6 @@ st.sidebar.markdown("""
   - SERPAPI_KEY = your-key
   - OPENAI_API_KEY = your-key
 - SerpAPI credits are consumed per search.
-- City names work with the Google search engine. For more precise results, enter Latitude + Longitude.
-- To pin a business that is NOT listed, fill in Business Address, Phone, and Latitude/Longitude.
+- When the target business appears in results, NAP and coordinates are captured automatically and used for the BIG RED PIN.
+- Optional override fields let you force an address, phone, or coordinates if needed.
 """)
