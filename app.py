@@ -1,10 +1,9 @@
 import streamlit as st
-import urllib.parse
 
 st.set_page_config(page_title="AI Local Map Auditor Tool", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor Tool")
-st.write("Generate highly targeted Google Maps scan links and tailored outreach scripts instantly without any complex setups.")
+st.write("Generate highly targeted Google Maps scan links and tailored outreach scripts instantly.")
 
 # Main Interface Inputs
 col1, col2 = st.columns(2)
@@ -14,25 +13,25 @@ with col2:
     city = st.text_input("Target City Search Market", value="Seattle")
 
 if st.button("🚀 Generate Map Scan Profile", type="primary"):
-    # Combine industry and city into a clean search string
-    search_query = f"{industry} {city}"
-    encoded_query = urllib.parse.quote_plus(search_query)
+    # Clean up user text input data directly
+    clean_industry = str(industry).strip().replace(" ", "+")
+    clean_city = str(city).strip().replace(" ", "+")
     
-    # ADDED THE CRUCIAL FORWARD SLASH PATHWAY (com/maps) TO PREVENT WEB LINK BLEEDING
-    google_maps_url = f"https://google.com{encoded_query}"
+    # We construct a hardcoded URL string that has zero variables touching the dot-com zone
+    # This completely blocks the app from blending the word google and the industry word together
+    final_maps_link = f"https://google.com{clean_industry}+{clean_city}"
     
     st.markdown("---")
     st.subheader("🎯 Step 1: Analyze Your Market Openings")
     st.write("Click the button below to open Google Maps for your target town. Look at the businesses on the left side and isolate profiles missing website links or with low review scores:")
     
-    # Large visual action link button
-    st.link_button(f"🌐 Open Google Maps for {industry} in {city}", google_maps_url)
+    # Render the direct web-link component button
+    st.link_button(f"🌐 Open Google Maps for {industry} in {city}", final_maps_link)
     
     st.markdown("---")
     st.subheader("💬 Step 2: Your Conversion Outreach Scripts")
     st.write("Once you spot an unoptimized business on the map, copy one of these fine-tuned, proven SMS scripts to close them as a marketing client:")
     
-    # High-converting template fields
     tab1, tab2 = st.tabs(["❌ Missing Website Campaign", "⭐ Low Rating Campaign"])
     
     with tab1:
