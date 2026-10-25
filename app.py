@@ -11,7 +11,6 @@ st.write("Extract unoptimized business leads straight from Google Maps and insta
 # Sidebar Configuration for Credentials
 st.sidebar.header("🔑 Authentication Setup")
 
-# We use unique variable names separate from the label strings
 input_serp_key = st.sidebar.text_input("Enter your SerpAPI Key below:", type="password", key="serp_raw_input")
 input_openai_key = st.sidebar.text_input("Enter your OpenAI Key below:", type="password", key="openai_raw_input")
 
@@ -23,15 +22,14 @@ with col2:
     city = st.text_input("Target City Search Market", value="Seattle")
 
 if st.button("🚀 Execute Market Scan", type="primary"):
-    if not input_serp_key or not input_openai_key:
-        st.error("⚠️ Please fill in both your SerpAPI and OpenAI keys in the sidebar configuration.")
+    # Safety Check 1: Force Streamlit to wait until actual characters are inside the fields
+    clean_serp = str(input_serp_key).strip()
+    clean_openai = str(input_openai_key).strip()
+    
+    if len(clean_serp) < 10 or len(clean_openai) < 10:
+        st.error("⚠️ The API keys in the sidebar are missing or too short! Please paste your full keys into the sidebar text boxes before hitting the scan button.")
     else:
-        # Strictly clean the text data away from the Streamlit elements
-        clean_serp = str(input_serp_key).strip()
-        clean_openai = str(input_openai_key).strip()
-        
         with st.spinner("Running System Connection Diagnostics..."):
-            # Diagnostic Step 1: Test SerpAPI Connection directly via a safe param dict
             test_url = "https://serpapi.com"
             test_params = {"engine": "google_maps", "q": "test", "api_key": clean_serp}
             try:
@@ -52,7 +50,18 @@ if st.button("🚀 Execute Market Scan", type="primary"):
             
             try:
                 response = requests.get(url, params=params, timeout=15)
-                response_data = response.json()
+                
+                # Safety Check 2: Protect against blank internet responses
+                if not response.text or response.text.strip() == "":
+                    st.error("❌ Network Warning: Handed a completely empty response from SerpAPI. This means the server blocked the request. Double-check your keys.")
+                    st.stop()
+                
+                # Safety Check 3: Make sure it's valid data text before parsing
+                try:
+                    response_data = response.json()
+                except Exception:
+                    st.error(f"❌ Network Warning: Server did not return a valid data format. Raw message: {response.text[:200]}")
+                    st.stop()
                 
                 if "error" in response_data:
                     st.error(f"❌ SerpAPI blocker: {response_data['error']}")
@@ -90,7 +99,6 @@ if st.button("🚀 Execute Market Scan", type="primary"):
                             gap_reason = f"Low Trust Metrics ({reviews} reviews)"
                             
                         if is_vulnerable and phone != "N/A":
-                            # Process OpenAI Safely
                             ai_url = "https://openai.com"
                             headers = {"Authorization": f"Bearer {clean_openai}", "Content-Type": "application/json"}
                             prompt = f"Write a casual SMS text message to a local business named '{name}'. Keep it under 160 characters. Point out that their profile is showing as: {gap_reason}. Ask if they want a fast fix."
@@ -105,8 +113,11 @@ if st.button("🚀 Execute Market Scan", type="primary"):
                                 elif ai_response.status_code != 200:
                                     sms_text = f"[AI Engine Issue: Error Code {ai_response.status_code}]"
                                 else:
-                                    res_json = ai_response.json()
-                                    sms_text = res_json['choices']['message']['content'].strip()
+                                    try:
+                                        res_json = ai_response.json()
+                                        sms_text = res_json['choices']['message']['content'].strip()
+                                    except:
+                                        sms_text = "[AI Parsing Error: Empty response back from OpenAI.]"
                             except:
                                 sms_text = "Could not parse AI message generation."
                                 
