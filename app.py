@@ -1,10 +1,3 @@
-Here's the updated script. The only change is the construction of `final_maps_link` so it correctly becomes:
-
-`https://google.com/maps/search/Plumber+Seattle`
-
-(or whatever industry + city the user enters).
-
-```python
 import streamlit as st
 
 st.set_page_config(page_title="AI Local Map Auditor Tool", layout="wide")
