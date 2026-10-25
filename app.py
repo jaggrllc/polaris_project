@@ -37,8 +37,6 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
         try:
             client = serpapi.Client(api_key=serpapi_key)
 
-            # Use google_maps + ll when coordinates are given
-            # Use regular google engine + location when only a city is given
             if lat != 0.0 and lon != 0.0:
                 params = {
                     "engine": "google_maps",
@@ -58,10 +56,8 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
 
             results = client.search(params)
 
-            # Extract local results depending on engine
             if "local_results" in results:
                 local_results = results["local_results"]
-                # google engine sometimes nests them
                 if isinstance(local_results, dict) and "places" in local_results:
                     local_results = local_results["places"]
             else:
@@ -149,4 +145,4 @@ st.sidebar.markdown("""
   - OPENAI_API_KEY = your-key
 - SerpAPI credits are consumed per search.
 - City names work with the Google search engine. For more precise results, enter Latitude + Longitude.
-""")n avoids the 400 error by using the correct engine for each input type.
+""")
