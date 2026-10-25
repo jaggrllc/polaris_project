@@ -1,7 +1,3 @@
-app.py**Copy only the Python code below.**  
-Do **not** copy any of the text above or below this code block into your `app.py` file.
-
-```python
 import streamlit as st
 import pandas as pd
 import serpapi
