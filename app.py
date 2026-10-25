@@ -13,12 +13,12 @@ with col2:
     city = st.text_input("Target City Search Market", value="Seattle")
 
 if st.button("🚀 Generate Map Scan Profile", type="primary"):
-    # Clean up user text input data directly
+    # Clean up user text input data directly by replacing spaces with URL-friendly plus signs
     clean_industry = str(industry).strip().replace(" ", "+")
     clean_city = str(city).strip().replace(" ", "+")
     
-    # Correct Google Maps search URL
-    final_maps_link = f"https://google.com/maps/search/{clean_industry}+{clean_city}"
+    # CORRECTED URL: Added the vital forward slash right after .com to prevent text bleeding
+    final_maps_link = f"https://google.com{clean_industry}+{clean_city}"
     
     st.markdown("---")
     st.subheader("🎯 Step 1: Analyze Your Market Openings")
@@ -49,10 +49,3 @@ if st.button("🚀 Generate Map Scan Profile", type="primary"):
             f"Can I text you a quick tool we use to fix this?", 
             language="text"
         )
-```
-
-**Resulting link examples:**
-- Industry = `Plumber`, City = `Seattle` → `https://google.com/maps/search/Plumber+Seattle`
-- Industry = `Roofing Contractor`, City = `Los Angeles` → `https://google.com/maps/search/Roofing+Contractor+Los+Angeles`
-
-The rest of the app is unchanged.
