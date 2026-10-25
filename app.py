@@ -10,8 +10,10 @@ st.write("Extract unoptimized business leads straight from Google Maps and insta
 
 # Sidebar Configuration for Credentials
 st.sidebar.header("🔑 Authentication Setup")
-serp_key = st.sidebar.text_input("SerpAPI Secret Key", type="password")
-openai_key = st.sidebar.text_input("OpenAI Secret Key", type="password")
+
+# We use unique variable names separate from the label strings
+input_serp_key = st.sidebar.text_input("Enter your SerpAPI Key below:", type="password", key="serp_raw_input")
+input_openai_key = st.sidebar.text_input("Enter your OpenAI Key below:", type="password", key="openai_raw_input")
 
 # Main Interface Inputs
 col1, col2 = st.columns(2)
@@ -21,51 +23,45 @@ with col2:
     city = st.text_input("Target City Search Market", value="Seattle")
 
 if st.button("🚀 Execute Market Scan", type="primary"):
-    if not serp_key or not openai_key:
+    if not input_serp_key or not input_openai_key:
         st.error("⚠️ Please fill in both your SerpAPI and OpenAI keys in the sidebar configuration.")
     else:
-        # Prepare Clean Keys
-        clean_serp = serp_key.strip()
-        clean_openai = openai_key.strip()
+        # Strictly clean the text data away from the Streamlit elements
+        clean_serp = str(input_serp_key).strip()
+        clean_openai = str(input_openai_key).strip()
         
         with st.spinner("Running System Connection Diagnostics..."):
-            # Diagnostic Step 1: Test SerpAPI Connection directly
-            test_url = f"https://serpapi.com{clean_serp}"
+            # Diagnostic Step 1: Test SerpAPI Connection directly via a safe param dict
+            test_url = "https://serpapi.com"
+            test_params = {"engine": "google_maps", "q": "test", "api_key": clean_serp}
             try:
-                test_res = requests.get(test_url, timeout=10)
+                test_res = requests.get(test_url, params=test_params, timeout=10)
                 if test_res.status_code == 401:
-                    st.error("❌ Diagnostic Failure: Your SerpAPI Key is Invalid or has been pasted incorrectly. Please log into SerpAPI.com, copy your key fresh, and re-paste it.")
+                    st.error("❌ Diagnostic Failure: Your SerpAPI Key is Invalid. Please copy it fresh from SerpAPI.com and try again.")
                     st.stop()
                 elif test_res.status_code == 403:
-                    st.error("❌ Diagnostic Failure: SerpAPI access forbidden. Your account free search quota may have run out.")
+                    st.error("❌ Diagnostic Failure: SerpAPI access forbidden. Check if your account limit has run out.")
                     st.stop()
             except Exception as e:
-                st.error(f"❌ Could not reach SerpAPI servers. Network issue: {e}")
+                st.error(f"❌ Connection error: {e}")
                 st.stop()
 
         with st.spinner("Mining Google Maps listings... Please wait..."):
-            url = "https://serpapi.com/search.json"
+            url = "https://serpapi.com"
             params = {"engine": "google_maps", "q": f"{industry} in {city}", "api_key": clean_serp}
             
             try:
                 response = requests.get(url, params=params, timeout=15)
                 response_data = response.json()
                 
-                # Check for explicit errors sent by SerpAPI
                 if "error" in response_data:
-                    st.error(f"❌ SerpAPI returned a specific blocker: {response_data['error']}")
+                    st.error(f"❌ SerpAPI blocker: {response_data['error']}")
                     st.stop()
                     
-                # Look at map search health
-                search_info = response_data.get("search_information", {})
-                if search_info.get("local_results_state") == "Fully empty" or "Google hasn't returned any results" in str(response_data):
-                    st.warning(f"⚠️ Google Maps has 0 records matching '{industry}' inside '{city}'. Try testing a broader industry keyword (like 'Roofing') or a bigger metropolitan area.")
-                    st.stop()
-                
                 leads = response_data.get("local_results", [])
                 
                 if not leads:
-                    st.warning("No listings found. Google Maps might not have found matching businesses in this exact area.")
+                    st.warning("No listings found. Try a different city or industry keyword.")
                 else:
                     csv_buffer = io.StringIO()
                     writer = csv.writer(csv_buffer)
@@ -105,7 +101,7 @@ if st.button("🚀 Execute Market Scan", type="primary"):
                                 if ai_response.status_code == 401:
                                     sms_text = "[OpenAI Error: Your Secret Key is invalid or has expired.]"
                                 elif ai_response.status_code == 429:
-                                    sms_text = "[OpenAI Error: You have hit your limit or your prepaid $5 account balance is empty.]"
+                                    sms_text = "[OpenAI Error: Your prepaid $5 account balance is empty.]"
                                 elif ai_response.status_code != 200:
                                     sms_text = f"[AI Engine Issue: Error Code {ai_response.status_code}]"
                                 else:
