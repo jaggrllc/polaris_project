@@ -25,68 +25,87 @@ if st.button("🚀 Execute Market Scan", type="primary"):
         st.error("Please fill in your API keys in the sidebar configuration.")
     else:
         with st.spinner("Mining Google Maps and compiling market analysis... Please wait..."):
-            # Fetch Map Data
+            # Fetch Map Data safely
             url = "https://serpapi.com"
             params = {"engine": "google_maps", "q": f"{industry} in {city}", "api_key": serp_key}
-            response = requests.get(url, params=params).json()
-            leads = response.get("local_results", [])
             
-            if not leads:
-                st.warning("No listings discovered for this parameters combination.")
-            else:
-                csv_buffer = io.StringIO()
-                writer = csv.writer(csv_buffer)
-                writer.writerow(["Name", "Phone", "Rating", "Reviews", "Issue", "SMS Text Message"])
+            try:
+                response = requests.get(url, params=params)
                 
-                valid_leads_count = 0
-                
-                for business in leads:
-                    name = business.get("title")
-                    phone = business.get("phone", "N/A")
-                    rating = business.get("rating", 0)
-                    reviews = business.get("reviews", 0)
-                    website = business.get("website")
+                # Check if SerpAPI returned a real error page
+                if response.status_code != 200:
+                    st.error(f"❌ SerpAPI Error (Status Code {response.status_code}): {response.text}")
+                else:
+                    response_data = response.json()
                     
-                    is_vulnerable = False
-                    gap_reason = ""
-                    
-                    if not website:
-                        is_vulnerable = True
-                        gap_reason = "Missing Website"
-                    elif rating < 4.3:
-                        is_vulnerable = True
-                        gap_reason = f"Low Rating ({rating}⭐)"
-                    elif reviews < 15:
-                        is_vulnerable = True
-                        gap_reason = f"Low Trust Metrics ({reviews} reviews)"
+                    # Check if SerpAPI sent back an explicit error message in the data
+                    if "error" in response_data:
+                        st.error(f"❌ SerpAPI says: {response_data['error']}")
+                    else:
+                        leads = response_data.get("local_results", [])
                         
-                    if is_vulnerable and phone != "N/A":
-                        # Fetch AI Copy
-                        ai_url = "https://openai.com"
-                        headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
-                        prompt = f"Write a casual SMS to a business named '{name}'. Keep it under 160 characters. Mention they are: {gap_reason}. Ask if they want a fix."
-                        data = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "temperature": 0.6}
-                        
-                        try:
-                            res = requests.post(ai_url, headers=headers, json=data).json()
-                            sms_text = res['choices']['message']['content'].strip()
-                        except:
-                            sms_text = "API limit hit or error."
+                        if not leads:
+                            st.warning("No listings discovered for this parameters combination.")
+                        else:
+                            csv_buffer = io.StringIO()
+                            writer = csv.writer(csv_buffer)
+                            writer.writerow(["Name", "Phone", "Rating", "Reviews", "Issue", "SMS Text Message"])
                             
-                        # Display output directly to dashboard layout
-                        with st.expander(f"🚨 Lead: {name} | Phone: {phone} | Trigger: {gap_reason}"):
-                            st.subheader("Generated Automated SMS Pitch:")
-                            st.info(sms_text)
+                            valid_leads_count = 0
                             
-                        writer.writerow([name, phone, rating, reviews, gap_reason, sms_text])
-                        valid_leads_count += 1
-                
-                # Global file export options
-                if valid_leads_count > 0:
-                    st.success(f"Processing complete! {valid_leads_count} actionable leads discovered.")
-                    st.download_button(
-                        label="📥 Download Extracted Spreadsheet Leads (.CSV)",
-                        data=csv_buffer.getvalue(),
-                        file_name=f"maps_audit_{city.lower()}.csv",
-                        mime="text/csv"
-                    )
+                            for business in leads:
+                                name = business.get("title")
+                                phone = business.get("phone", "N/A")
+                                rating = business.get("rating", 0)
+                                reviews = business.get("reviews", 0)
+                                website = business.get("website")
+                                
+                                is_vulnerable = False
+                                gap_reason = ""
+                                
+                                if not website:
+                                    is_vulnerable = True
+                                    gap_reason = "Missing Website"
+                                elif rating < 4.3:
+                                    is_vulnerable = True
+                                    gap_reason = f"Low Rating ({rating}⭐)"
+                                elif reviews < 15:
+                                    is_vulnerable = True
+                                    gap_reason = f"Low Trust Metrics ({reviews} reviews)"
+                                    
+                                if is_vulnerable and phone != "N/A":
+                                    # Fetch AI Copy safely
+                                    ai_url = "https://openai.com"
+                                    headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
+                                    prompt = f"Write a casual SMS to a business named '{name}'. Keep it under 160 characters. Mention they are: {gap_reason}. Ask if they want a fix."
+                                    data = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "temperature": 0.6}
+                                    
+                                    try:
+                                        ai_response = requests.post(ai_url, headers=headers, json=data)
+                                        if ai_response.status_code != 200:
+                                            sms_text = f"[AI Key Error: Status {ai_response.status_code}]"
+                                        else:
+                                            res_json = ai_response.json()
+                                            sms_text = res_json['choices']['message']['content'].strip()
+                                    except:
+                                        sms_text = "Could not generate AI text."
+                                        
+                                    with st.expander(f"🚨 Lead: {name} | Phone: {phone} | Trigger: {gap_reason}"):
+                                        st.subheader("Generated Automated SMS Pitch:")
+                                        st.info(sms_text)
+                                        
+                                    writer.writerow([name, phone, rating, reviews, gap_reason, sms_text])
+                                    valid_leads_count += 1
+                            
+                            if valid_leads_count > 0:
+                                st.success(f"Processing complete! {valid_leads_count} actionable leads discovered.")
+                                st.download_button(
+                                    label="📥 Download Extracted Spreadsheet Leads (.CSV)",
+                                    data=csv_buffer.getvalue(),
+                                    file_name=f"maps_audit_{city.lower()}.csv",
+                                    mime="text/csv"
+                                )
+                            else:
+                                st.info("Found business listings, but all of them were already perfectly optimized!")
+            except Exception as e:
+                st.error(f"Something went wrong connecting to the web services: {e}")
