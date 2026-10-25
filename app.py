@@ -1,8 +1,3 @@
-**Fixed `app.py`** (the unterminated triple-quoted string was caused by the nested code block inside the sidebar markdown).
-
-Replace your entire `app.py` with this version:
-
-```python
 import streamlit as st
 import pandas as pd
 import serpapi
