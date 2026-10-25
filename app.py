@@ -20,9 +20,9 @@ openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. Joe's Pizza")
-    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. pizza near me")
+    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaping")
 with col2:
-    location_input = st.text_input("Location (city or address)", placeholder="e.g. Austin, TX")
+    location_input = st.text_input("Location (city or address)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Longitude (optional)", value=0.0, format="%.6f")
 
@@ -37,20 +37,35 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
         try:
             client = serpapi.Client(api_key=serpapi_key)
 
-            params = {
-                "engine": "google_maps",
-                "q": keyword,
-                "type": "search",
-                "hl": "en",
-            }
-
+            # Use google_maps + ll when coordinates are given
+            # Use regular google engine + location when only a city is given
             if lat != 0.0 and lon != 0.0:
-                params["ll"] = f"@{lat},{lon},{zoom}z"
+                params = {
+                    "engine": "google_maps",
+                    "q": keyword,
+                    "type": "search",
+                    "hl": "en",
+                    "ll": f"@{lat},{lon},{zoom}z",
+                }
             else:
-                params["location"] = location_input
+                params = {
+                    "engine": "google",
+                    "q": keyword,
+                    "location": location_input,
+                    "hl": "en",
+                    "gl": "us",
+                }
 
             results = client.search(params)
-            local_results = results.get("local_results", [])
+
+            # Extract local results depending on engine
+            if "local_results" in results:
+                local_results = results["local_results"]
+                # google engine sometimes nests them
+                if isinstance(local_results, dict) and "places" in local_results:
+                    local_results = local_results["places"]
+            else:
+                local_results = results.get("local_results", {}).get("places", [])
 
             if not local_results:
                 st.warning("No local results returned. Try a different keyword or location.")
@@ -59,6 +74,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
 
             rows = []
             for item in local_results[:15]:
+                gps = item.get("gps_coordinates", {})
                 rows.append({
                     "Position": item.get("position"),
                     "Title": item.get("title"),
@@ -66,8 +82,8 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     "Reviews": item.get("reviews"),
                     "Address": item.get("address"),
                     "Type": item.get("type"),
-                    "Latitude": item.get("gps_coordinates", {}).get("latitude"),
-                    "Longitude": item.get("gps_coordinates", {}).get("longitude"),
+                    "Latitude": gps.get("latitude"),
+                    "Longitude": gps.get("longitude"),
                 })
 
             df = pd.DataFrame(rows)
@@ -80,12 +96,12 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                 st.map(map_df, latitude="Latitude", longitude="Longitude")
 
             target_found = any(
-                business_name.lower() in (r.get("title") or "").lower()
+                business_name.lower() in (str(r.get("title") or "")).lower()
                 for r in local_results
             )
             target_position = next(
                 (r.get("position") for r in local_results
-                 if business_name.lower() in (r.get("title") or "").lower()),
+                 if business_name.lower() in (str(r.get("title") or "")).lower()),
                 None
             )
 
@@ -96,7 +112,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
             )
 
             summary_text = df.to_string(index=False)
-            prompt = f"""You are a helpful local SEO assistant. Analyze these Google Maps local results for the keyword "{keyword}" near "{location_input or f'{lat},{lon}'}".
+            prompt = f"""You are a helpful local SEO assistant. Analyze these Google Maps / local results for the keyword "{keyword}" near "{location_input or f'{lat},{lon}'}".
 
 Target business: {business_name}
 Found in results: {target_found}
@@ -132,5 +148,5 @@ st.sidebar.markdown("""
   - SERPAPI_KEY = your-key
   - OPENAI_API_KEY = your-key
 - SerpAPI credits are consumed per search.
-- This is a basic single-location auditor. Multi-point grid scans would require multiple API calls and more logic.
-""")
+- City names work with the Google search engine. For more precise results, enter Latitude + Longitude.
+""")n avoids the 400 error by using the correct engine for each input type.
