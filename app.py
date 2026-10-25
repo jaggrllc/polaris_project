@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import serpapi
 from openai import OpenAI
+import folium
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -88,8 +90,25 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
 
             map_df = df.dropna(subset=["Latitude", "Longitude"])
             if not map_df.empty:
-                st.subheader("Map of Top Results")
-                st.map(map_df, latitude="Latitude", longitude="Longitude")
+                st.subheader("Map of Top Results (Google Maps)")
+                center_lat = map_df["Latitude"].mean()
+                center_lon = map_df["Longitude"].mean()
+
+                m = folium.Map(
+                    location=[center_lat, center_lon],
+                    zoom_start=12,
+                    tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+                    attr="Google Maps"
+                )
+
+                for _, row in map_df.iterrows():
+                    folium.Marker(
+                        location=[row["Latitude"], row["Longitude"]],
+                        popup=row["Title"],
+                        tooltip=row["Title"]
+                    ).add_to(m)
+
+                st_folium(m, width=800, height=500)
 
             target_found = any(
                 business_name.lower() in (str(r.get("title") or "")).lower()
