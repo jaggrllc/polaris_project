@@ -1,3 +1,8 @@
+**Fixed `app.py`** (the unterminated triple-quoted string was caused by the nested code block inside the sidebar markdown).
+
+Replace your entire `app.py` with this version:
+
+```python
 import streamlit as st
 import pandas as pd
 import serpapi
@@ -136,6 +141,19 @@ Write a clear, practical action plan (5-8 bullet points) the business owner coul
             st.error(f"Error during audit: {str(e)}")
             st.info("Common issues: invalid API key, insufficient SerpAPI credits, or bad location format.")
 
+# Fixed sidebar (no nested triple quotes)
 st.sidebar.markdown("""
 ### Setup notes
-- On Streamlit Cloud, add secrets in the dashboard:
+- On Streamlit Cloud, add secrets in the dashboard as:
+  - SERPAPI_KEY = your-key
+  - OPENAI_API_KEY = your-key
+- SerpAPI credits are consumed per search.
+- This is a basic single-location auditor. Multi-point grid scans would require multiple API calls and more logic.
+""")
+```
+
+**What changed**
+- Removed the nested ` ``` ` code block inside the triple-quoted string (that was breaking the Python parser).
+- Sidebar notes are now plain markdown.
+
+Save this as `app.py`, push to GitHub, and redeploy on Streamlit. The SyntaxError should be gone.
