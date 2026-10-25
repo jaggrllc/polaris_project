@@ -4,17 +4,18 @@ import serpapi
 from openai import OpenAI
 import folium
 from streamlit_folium import st_folium
+from datetime import datetime
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Simple local visibility check + AI action plan. Uses SerpAPI + OpenAI. Not affiliated with any other product.")
+st.caption("Local visibility check + AI insights. Original tool — not affiliated with any other product.")
 
 def get_secret(name: str, label: str):
     try:
         return st.secrets[name]
     except Exception:
-        return st.sidebar.text_input(label, type="password", help="Enter temporarily for local testing. On Streamlit Cloud, put this in secrets.")
+        return st.sidebar.text_input(label, type="password")
 
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
@@ -30,74 +31,74 @@ if "results_ready" not in st.session_state:
     st.session_state.target_address = ""
     st.session_state.target_phone = ""
     st.session_state.auto_nap = ""
+    st.session_state.visibility_score = None
+    st.session_state.competitors = ""
+    st.session_state.sample_content = ""
 
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. Joe's Pizza")
     keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaping")
-    business_address = st.text_input("Business Address (optional override)", placeholder="Leave blank to auto-fill from results")
-    business_phone = st.text_input("Business Phone (optional override)", placeholder="Leave blank to auto-fill from results")
+    business_address = st.text_input("Business Address (optional override)")
+    business_phone = st.text_input("Business Phone (optional override)")
 with col2:
-    location_input = st.text_input("Search Location (city or address)", placeholder="e.g. Jacksonville, FL")
+    location_input = st.text_input("Search Location (city)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Search Center Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Search Center Longitude (optional)", value=0.0, format="%.6f")
     biz_lat = st.number_input("Business Latitude (optional override)", value=0.0, format="%.6f")
     biz_lon = st.number_input("Business Longitude (optional override)", value=0.0, format="%.6f")
 
-zoom = st.slider("Map Zoom (for SerpAPI ll)", 10, 18, 14)
+do_grid = st.checkbox("Run simple 3-point visibility check (uses extra SerpAPI credits)", value=False)
+zoom = st.slider("Map Zoom (for ll)", 10, 18, 14)
 
 if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_key)):
     if not business_name or not keyword or (not location_input and lat == 0.0):
-        st.error("Please provide a business name, keyword, and either a location or coordinates.")
+        st.error("Please provide a business name, keyword, and a location or coordinates.")
     else:
-        with st.spinner("Fetching local results from SerpAPI..."):
+        with st.spinner("Running audit..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
+                points = []
 
+                # Define points: center + optional offsets for simple grid
                 if lat != 0.0 and lon != 0.0:
-                    params = {
-                        "engine": "google_maps",
-                        "q": keyword,
-                        "type": "search",
-                        "hl": "en",
-                        "ll": f"@{lat},{lon},{zoom}z",
-                    }
+                    center_ll = f"@{lat},{lon},{zoom}z"
+                    points.append(("Center", center_ll))
+                    if do_grid:
+                        offset = 0.02  # ~2 km
+                        points.append(("North", f"@{lat+offset},{lon},{zoom}z"))
+                        points.append(("East", f"@{lat},{lon+offset},{zoom}z"))
                 else:
-                    params = {
-                        "engine": "google",
-                        "q": keyword,
-                        "location": location_input,
-                        "hl": "en",
-                        "gl": "us",
-                    }
+                    points.append(("Main", None))  # location string only
 
-                results = client.search(params)
+                all_local = []
+                point_results = []
 
-                if "local_results" in results:
-                    local_results = results["local_results"]
-                    if isinstance(local_results, dict) and "places" in local_results:
-                        local_results = local_results["places"]
+                for label, ll in points:
+                    if ll:
+                        params = {"engine": "google_maps", "q": keyword, "type": "search", "hl": "en", "ll": ll}
+                    else:
+                        params = {"engine": "google", "q": keyword, "location": location_input, "hl": "en", "gl": "us"}
+
+                    res = client.search(params)
+                    local = res.get("local_results", [])
+                    if isinstance(local, dict) and "places" in local:
+                        local = local["places"]
+                    all_local.extend(local or [])
+                    point_results.append((label, local or []))
+
+                if not all_local:
+                    st.warning("No local results returned.")
                 else:
-                    local_results = results.get("local_results", {}).get("places", [])
-
-                if not local_results:
-                    st.warning("No local results returned. Try a different keyword or location.")
-                else:
+                    # Build table from first/main point
+                    main_local = point_results[0][1]
                     rows = []
-                    target_lat = None
-                    target_lon = None
-                    target_address = ""
-                    target_phone = ""
+                    target_lat = target_lon = None
+                    target_address = target_phone = ""
 
-                    for item in local_results[:15]:
+                    for item in main_local[:12]:
                         gps = item.get("gps_coordinates", {}) or {}
-                        # Try multiple possible phone keys
-                        phone = (
-                            item.get("phone")
-                            or item.get("phone_number")
-                            or item.get("telephone")
-                            or ""
-                        )
+                        phone = item.get("phone") or item.get("phone_number") or ""
                         rows.append({
                             "Position": item.get("position"),
                             "Title": item.get("title"),
@@ -105,161 +106,145 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Reviews": item.get("reviews"),
                             "Address": item.get("address"),
                             "Phone": phone,
-                            "Type": item.get("type"),
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
                         })
-
-                        # Automatically capture target business data when name matches
-                        if business_name.lower() in (str(item.get("title") or "")).lower():
+                        if business_name.lower() in str(item.get("title") or "").lower():
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
                             target_phone = phone
 
-                    # User overrides take priority if supplied
-                    if biz_lat != 0.0 and biz_lon != 0.0:
-                        target_lat = biz_lat
-                        target_lon = biz_lon
+                    if biz_lat and biz_lon:
+                        target_lat, target_lon = biz_lat, biz_lon
                     if business_address.strip():
                         target_address = business_address.strip()
                     if business_phone.strip():
                         target_phone = business_phone.strip()
 
                     df = pd.DataFrame(rows)
+                    target_found = any(business_name.lower() in str(r.get("title") or "").lower() for r in main_local)
+                    target_position = next((r.get("position") for r in main_local if business_name.lower() in str(r.get("title") or "").lower()), None)
 
-                    target_found = target_lat is not None
-                    target_position = next(
-                        (r.get("position") for r in local_results
-                         if business_name.lower() in (str(r.get("title") or "")).lower()),
-                        None
+                    # Visibility score across points
+                    top3_count = 0
+                    for _, locs in point_results:
+                        for item in locs[:3]:
+                            if business_name.lower() in str(item.get("title") or "").lower():
+                                top3_count += 1
+                                break
+                    visibility_score = round((top3_count / len(points)) * 100) if points else 0
+
+                    # Competitor frequency
+                    from collections import Counter
+                    titles = [item.get("title") for item in all_local if item.get("title")]
+                    competitors = Counter(titles).most_common(5)
+                    comp_text = "\n".join([f"{name}: {count} appearances" for name, count in competitors])
+
+                    # AI plan + sample content
+                    summary = df.to_string(index=False)
+                    prompt = f"""Analyze local results for "{keyword}" near {location_input or f'{lat},{lon}'}.
+Target: {business_name} (found: {target_found}, position: {target_position}, visibility score: {visibility_score}%).
+Top results:\n{summary}
+Competitors:\n{comp_text}
+
+1. Write a practical 5-8 bullet action plan.
+2. Then write a short sample Google Business Profile post idea.
+3. Then a brief outline for a local service page (3-4 headings).
+Keep everything concise and realistic. Do not invent data."""
+
+                    oai = OpenAI(api_key=openai_key)
+                    completion = oai.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.4,
                     )
+                    full_ai = completion.choices[0].message.content
+                    plan = full_ai.split("2.")[0] if "2." in full_ai else full_ai
+                    sample_content = full_ai
 
-                    auto_nap = f"Name: {business_name}\nAddress: {target_address or 'Not available'}\nPhone: {target_phone or 'Not available'}"
-
-                    summary_text = df.to_string(index=False)
-                    prompt = f"""You are a helpful local SEO assistant. Analyze these Google Maps / local results for the keyword "{keyword}" near "{location_input or f'{lat},{lon}'}".
-
-Target business: {business_name}
-Found in results: {target_found}
-Position (if found): {target_position}
-
-Top results:
-{summary_text}
-
-Write a clear, practical action plan (5-8 bullet points) the business owner could take to improve local visibility. Focus on realistic steps: Google Business Profile optimization, reviews, website/local content, photos, categories, posts, etc. Keep language simple and non-technical. Do not invent data."""
-
-                    with st.spinner("Generating AI action plan..."):
-                        oai = OpenAI(api_key=openai_key)
-                        completion = oai.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": "You are a practical local marketing advisor. Be concise and actionable."},
-                                {"role": "user", "content": prompt}
-                            ],
-                            temperature=0.4,
-                        )
-                        plan = completion.choices[0].message.content
-
-                    # Save auto-captured data
-                    st.session_state.results_ready = True
-                    st.session_state.df = df
-                    st.session_state.target_found = target_found
-                    st.session_state.target_position = target_position
-                    st.session_state.plan = plan
-                    st.session_state.target_lat = target_lat
-                    st.session_state.target_lon = target_lon
-                    st.session_state.target_address = target_address
-                    st.session_state.target_phone = target_phone
-                    st.session_state.auto_nap = auto_nap
+                    st.session_state.update({
+                        "results_ready": True,
+                        "df": df,
+                        "target_found": target_found,
+                        "target_position": target_position,
+                        "plan": plan,
+                        "target_lat": target_lat,
+                        "target_lon": target_lon,
+                        "target_address": target_address,
+                        "target_phone": target_phone,
+                        "auto_nap": f"Name: {business_name}\nAddress: {target_address or 'N/A'}\nPhone: {target_phone or 'N/A'}",
+                        "visibility_score": visibility_score,
+                        "competitors": comp_text,
+                        "sample_content": sample_content,
+                    })
 
             except Exception as e:
-                st.error(f"Error during audit: {str(e)}")
-                st.info("Common issues: invalid API key, insufficient SerpAPI credits, or bad location format.")
+                st.error(f"Error: {e}")
 
 if st.session_state.results_ready and st.session_state.df is not None:
+    st.metric("Visibility Score (approx. % in top 3)", f"{st.session_state.visibility_score}%")
     st.subheader("Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
-    # Show auto-captured NAP
-    if st.session_state.target_lat and st.session_state.target_lon:
-        st.success("**Auto-captured NAP for target business:**")
+    if st.session_state.target_lat:
+        st.success("Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
+    # Map
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
-    if not map_df.empty or (st.session_state.target_lat and st.session_state.target_lon):
-        st.subheader("Map of Top Results (Google Maps) — BIG RED PIN = Target Business")
+    if not map_df.empty or st.session_state.target_lat:
+        center = [st.session_state.target_lat or map_df["Latitude"].mean(),
+                  st.session_state.target_lon or map_df["Longitude"].mean()]
+        m = folium.Map(location=center, zoom_start=13,
+                       tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google Maps")
 
-        if st.session_state.target_lat and st.session_state.target_lon:
-            center_lat = st.session_state.target_lat
-            center_lon = st.session_state.target_lon
-        else:
-            center_lat = map_df["Latitude"].mean()
-            center_lon = map_df["Longitude"].mean()
-
-        m = folium.Map(
-            location=[center_lat, center_lon],
-            zoom_start=13,
-            tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-            attr="Google Maps"
-        )
-
-        # Normal pins for other results
         for _, row in map_df.iterrows():
             if business_name.lower() not in str(row["Title"]).lower():
-                folium.Marker(
-                    location=[row["Latitude"], row["Longitude"]],
-                    popup=f"{row['Title']}<br>{row.get('Address','')}<br>{row.get('Phone','')}",
-                    tooltip=row["Title"],
-                    icon=folium.Icon(color="blue", icon="info-sign")
-                ).add_to(m)
+                folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Title"],
+                              icon=folium.Icon(color="blue")).add_to(m)
 
-        # BIG RED PIN with auto NAP
         if st.session_state.target_lat and st.session_state.target_lon:
-            nap_html = f"""
-            <div style="font-family: Arial; font-size: 14px; width: 240px;">
-                <b style="color: red; font-size: 17px;">{business_name}</b><br><br>
-                <b>Address:</b> {st.session_state.target_address or 'Not available'}<br>
-                <b>Phone:</b> {st.session_state.target_phone or 'Not available'}
-            </div>
-            """
-            folium.Marker(
-                location=[st.session_state.target_lat, st.session_state.target_lon],
-                popup=folium.Popup(nap_html, max_width=280),
-                tooltip=f"TARGET: {business_name}",
-                icon=folium.Icon(color="red", icon="map-marker", prefix="fa")
-            ).add_to(m)
-        else:
-            st.info("Target business not found in results. Enter Business Latitude/Longitude (optional override fields) to place the BIG RED PIN.")
-
-        st_folium(m, width=800, height=500, returned_objects=[])
+            nap_html = f"<b style='color:red'>{business_name}</b><br>{st.session_state.target_address}<br>{st.session_state.target_phone}"
+            folium.Marker([st.session_state.target_lat, st.session_state.target_lon],
+                          popup=folium.Popup(nap_html, max_width=250),
+                          icon=folium.Icon(color="red", icon="map-marker", prefix="fa")).add_to(m)
+        st_folium(m, width=800, height=450, returned_objects=[])
 
     col_a, col_b = st.columns(2)
     with col_a:
-        st.metric(
-            "Listed on Google Business Profile?",
-            "Yes" if st.session_state.target_found else "No",
-            delta="Found in local results" if st.session_state.target_found else "Not found in local results"
-        )
+        st.metric("Listed on Google Business Profile?", "Yes" if st.session_state.target_found else "No")
     with col_b:
-        st.metric(
-            "Ranking Position",
-            st.session_state.target_position if st.session_state.target_position else "—",
-            delta="Top results" if st.session_state.target_position else "Not ranking for this search"
-        )
+        st.metric("Position", st.session_state.target_position or "—")
 
-    if not st.session_state.target_found:
-        st.warning(f"**{business_name}** does not appear to be listed (or is not ranking) in the Google Business Profile / Maps results for this search.")
+    st.subheader("Top Competitors (by appearance)")
+    st.text(st.session_state.competitors)
 
     st.subheader("AI Action Plan")
     st.markdown(st.session_state.plan)
 
-st.sidebar.markdown("""
-### Setup notes
-- On Streamlit Cloud, add secrets in the dashboard as:
-  - SERPAPI_KEY = your-key
-  - OPENAI_API_KEY = your-key
-- SerpAPI credits are consumed per search.
-- When the target business appears in results, NAP and coordinates are captured automatically and used for the BIG RED PIN.
-- Optional override fields let you force an address, phone, or coordinates if needed.
-""")
+    st.subheader("Sample Content Ideas")
+    st.markdown(st.session_state.sample_content)
+
+    # Downloadable report
+    report = f"""AI Local Map Auditor Report
+Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+Business: {business_name}
+Keyword: {keyword}
+Location: {location_input or f'{lat},{lon}'}
+Visibility Score: {st.session_state.visibility_score}%
+Listed: {'Yes' if st.session_state.target_found else 'No'}
+Position: {st.session_state.target_position or 'N/A'}
+
+NAP:
+{st.session_state.auto_nap}
+
+Competitors:
+{st.session_state.competitors}
+
+AI Insights:
+{st.session_state.sample_content}
+"""
+    st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
+
+st.sidebar.info("Simple 3-point check uses extra credits. All features are original implementations.")
