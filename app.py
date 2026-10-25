@@ -1,3 +1,7 @@
+app.py**Copy only the Python code below.**  
+Do **not** copy any of the text above or below this code block into your `app.py` file.
+
+```python
 import streamlit as st
 import pandas as pd
 import serpapi
@@ -134,9 +138,3 @@ st.sidebar.markdown("""
 - SerpAPI credits are consumed per search.
 - This is a basic single-location auditor. Multi-point grid scans would require multiple API calls and more logic.
 """)
-
-### What to do now
-1. Delete everything currently in your `app.py` on GitHub.
-2. Paste the code above exactly.
-3. Commit and push.
-4. Streamlit will redeploy automatically.
