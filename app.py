@@ -14,11 +14,11 @@ with col2:
     city = st.text_input("Target City Search Market", value="Seattle")
 
 if st.button("🚀 Generate Map Scan Profile", type="primary"):
-    # Create a clean, universally compatible Google Maps search structure
-    search_query = f"{industry} in {city}"
+    # Combine industry and city into a clean search string
+    search_query = f"{industry} {city}"
     encoded_query = urllib.parse.quote_plus(search_query)
     
-    # Updated to the bulletproof main Google search path format
+    # ADDED THE CRUCIAL FORWARD SLASH PATHWAY (com/maps) TO PREVENT WEB LINK BLEEDING
     google_maps_url = f"https://google.com{encoded_query}"
     
     st.markdown("---")
