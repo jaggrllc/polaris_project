@@ -19,7 +19,6 @@ def get_secret(name: str, label: str):
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
 
-# Initialize session state
 if "results_ready" not in st.session_state:
     st.session_state.results_ready = False
     st.session_state.df = None
@@ -128,7 +127,6 @@ Write a clear, practical action plan (5-8 bullet points) the business owner coul
                         )
                         plan = completion.choices[0].message.content
 
-                    # Save everything to session state so it persists
                     st.session_state.results_ready = True
                     st.session_state.df = df
                     st.session_state.local_results = local_results
@@ -142,7 +140,6 @@ Write a clear, practical action plan (5-8 bullet points) the business owner coul
                 st.error(f"Error during audit: {str(e)}")
                 st.info("Common issues: invalid API key, insufficient SerpAPI credits, or bad location format.")
 
-# Display results if they exist in session state (this keeps them visible)
 if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
@@ -167,14 +164,25 @@ if st.session_state.results_ready and st.session_state.df is not None:
                 tooltip=row["Title"]
             ).add_to(m)
 
-        # Important: capture return value to reduce unwanted reruns
         st_folium(m, width=800, height=500, returned_objects=[])
 
-    st.metric(
-        "Target Business Found in Results?",
-        "Yes" if st.session_state.target_found else "No",
-        delta=f"Position {st.session_state.target_position}" if st.session_state.target_position else "Not in top results"
-    )
+    # Clear Google Business Profile status
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.metric(
+            "Listed on Google Business Profile?",
+            "Yes" if st.session_state.target_found else "No",
+            delta="Found in local results" if st.session_state.target_found else "Not found in local results"
+        )
+    with col_b:
+        st.metric(
+            "Ranking Position",
+            st.session_state.target_position if st.session_state.target_position else "—",
+            delta="Top results" if st.session_state.target_position else "Not ranking for this search"
+        )
+
+    if not st.session_state.target_found:
+        st.warning(f"**{business_name}** does not appear to be listed (or is not ranking) in the Google Business Profile / Maps results for this search.")
 
     st.subheader("AI Action Plan")
     st.markdown(st.session_state.plan)
@@ -187,4 +195,3 @@ st.sidebar.markdown("""
 - SerpAPI credits are consumed per search.
 - City names work with the Google search engine. For more precise results, enter Latitude + Longitude.
 """)
-
