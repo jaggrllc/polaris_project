@@ -12,7 +12,7 @@ import re
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Local visibility check + AI insights. Original tool — not affiliated with any other product.")
+st.caption("Local visibility, competitor insight, and AI content tools. Original implementation.")
 
 def get_secret(name: str, label: str):
     try:
@@ -21,7 +21,6 @@ def get_secret(name: str, label: str):
         return st.sidebar.text_input(label, type="password")
 
 def normalize(name):
-    """Better normalization for business name matching."""
     if not name:
         return ""
     name = name.lower()
@@ -29,7 +28,6 @@ def normalize(name):
     name = re.sub(r'\b(llc|inc|ltd|co|company|the)\b', '', name)
     name = re.sub(r'[^a-z0-9\s]', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
-    # Treat "landscape" and "landscaping" as similar
     name = name.replace("landscaping", "landscape")
     return name
 
@@ -54,7 +52,7 @@ if "results_ready" not in st.session_state:
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. C&L Landscape")
-    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaper or landscaping")
+    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaper")
     business_address = st.text_input("Business Address (optional override)")
     business_phone = st.text_input("Business Phone (optional override)")
 with col2:
@@ -67,7 +65,6 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
         with st.spinner("Running audit..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
-
                 params = {
                     "engine": "google",
                     "q": keyword,
@@ -82,7 +79,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                 main_local = local or []
 
                 if not main_local:
-                    st.warning("No local results returned. Try a different keyword (e.g. 'landscaper' or 'landscaping company').")
+                    st.warning("No local results returned. Try a different keyword.")
                 else:
                     rows = []
                     target_lat = target_lon = None
@@ -121,23 +118,27 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                          if norm_target in normalize(str(r.get("title") or ""))),
                         None
                     )
-
                     visibility_score = 100 if target_found else 0
 
                     titles = [item.get("title") for item in main_local if item.get("title")]
                     competitors = Counter(titles).most_common(5)
-                    comp_text = "\n".join([f"{name}: {count} appearances" for name, count in competitors])
+                    comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
 
                     summary = df.to_string(index=False)
-                    prompt = f"""Analyze local results for "{keyword}" near {location_input}.
-Target: {business_name} (found: {target_found}, position: {target_position}).
-Top 5 results:\n{summary}
-Competitors:\n{comp_text}
+                    prompt = f"""You are a local SEO advisor. Analyze results for "{keyword}" near {location_input}.
+Target business: {business_name}
+Found in results: {target_found}
+Position: {target_position}
+Top results:
+{summary}
+Top competitors:
+{comp_text}
 
-1. Write a practical 5-8 bullet action plan.
-2. Then write a short sample Google Business Profile post idea.
-3. Then a brief outline for a local service page (3-4 headings).
-Keep everything concise and realistic. Do not invent data."""
+Provide:
+1. A practical 5-8 bullet action plan.
+2. One ready-to-use sample Google Business Profile post.
+3. A short outline for a local service page (3-4 headings with one-sentence descriptions).
+Keep language simple and realistic. Do not invent data."""
 
                     oai = OpenAI(api_key=openai_key)
                     completion = oai.chat.completions.create(
@@ -169,7 +170,7 @@ Keep everything concise and realistic. Do not invent data."""
                 st.error(f"Error: {e}")
 
 if st.session_state.results_ready and st.session_state.df is not None:
-    st.metric("Visibility Score (approx. % in top 3)", f"{st.session_state.visibility_score}%")
+    st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
 
     st.subheader("Top 5 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
@@ -177,19 +178,11 @@ if st.session_state.results_ready and st.session_state.df is not None:
     if st.session_state.target_found and st.session_state.target_lat:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
-
         name_encoded = quote(business_name)
-        maps_url = (
-            f"https://www.google.com/maps/place/{name_encoded}/"
-            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
-        )
+        maps_url = f"https://www.google.com/maps/place/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
     else:
-        st.warning(
-            f"**{business_name}** was not found in the top local results for this keyword. "
-            "It may still have a Google Business Profile, but it is not ranking for the search you entered. "
-            "Try keywords like 'landscaper', 'landscaping', or 'landscape company'."
-        )
+        st.warning(f"**{business_name}** was not found in the top local results for this keyword. It may still have a Google Business Profile but is not ranking for this search.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -197,12 +190,10 @@ if st.session_state.results_ready and st.session_state.df is not None:
                   st.session_state.target_lon or map_df["Longitude"].mean()]
         m = folium.Map(location=center, zoom_start=13,
                        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google Maps")
-
         for _, row in map_df.iterrows():
             if normalize(business_name) not in normalize(str(row["Title"])):
                 folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Title"],
                               icon=folium.Icon(color="blue")).add_to(m)
-
         if st.session_state.target_lat and st.session_state.target_lon:
             nap_html = f"<b style='color:red'>{business_name}</b><br>{st.session_state.target_address}<br>{st.session_state.target_phone}"
             folium.Marker([st.session_state.target_lat, st.session_state.target_lon],
@@ -216,13 +207,13 @@ if st.session_state.results_ready and st.session_state.df is not None:
     with col_b:
         st.metric("Position", st.session_state.target_position or "—")
 
-    st.subheader("Top Competitors (by appearance)")
+    st.subheader("Top Competitors")
     st.text(st.session_state.competitors)
 
     st.subheader("AI Action Plan")
     st.markdown(st.session_state.plan)
 
-    st.subheader("Sample Content Ideas")
+    st.subheader("Sample Content (GBP Post + Page Outline)")
     st.markdown(st.session_state.sample_content)
 
     report = f"""AI Local Map Auditor Report
@@ -246,9 +237,6 @@ Competitors:
 AI Insights:
 {st.session_state.sample_content}
 """
-    st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
+    st.download_button("Download Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info(
-    "Tip: For C&L Landscape try keywords such as 'landscaper', 'landscaping', or 'landscape company' "
-    "in Jacksonville, FL. Name matching now handles & and Landscape/Landscaping variations."
-)
+st.sidebar.info("Original tools inspired by common local SEO practices. No proprietary technology used.")
