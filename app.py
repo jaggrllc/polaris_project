@@ -95,8 +95,8 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     target_lat = target_lon = None
                     target_address = target_phone = ""
 
-                    # Explicitly take top 10
-                    for item in main_local[:10]:
+                    # Top 5 Local Results
+                    for item in main_local[:5]:
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
                         rows.append({
@@ -141,7 +141,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     summary = df.to_string(index=False)
                     prompt = f"""Analyze local results for "{keyword}" near {location_input or f'{lat},{lon}'}.
 Target: {business_name} (found: {target_found}, position: {target_position}, visibility score: {visibility_score}%).
-Top 10 results:\n{summary}
+Top 5 results:\n{summary}
 Competitors:\n{comp_text}
 
 1. Write a practical 5-8 bullet action plan.
@@ -181,7 +181,7 @@ Keep everything concise and realistic. Do not invent data."""
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score (approx. % in top 3)", f"{st.session_state.visibility_score}%")
 
-    st.subheader("Top 10 Local Results")
+    st.subheader("Top 5 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_lat:
@@ -234,7 +234,7 @@ Position: {st.session_state.target_position or 'N/A'}
 NAP:
 {st.session_state.auto_nap}
 
-Top 10 Local Results:
+Top 5 Local Results:
 {st.session_state.df.to_string(index=False)}
 
 Competitors:
