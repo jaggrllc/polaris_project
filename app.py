@@ -11,10 +11,10 @@ import re
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from reportlab.graphics.shapes import Drawing, Circle, String
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
@@ -120,7 +120,6 @@ else:
     bar_color = GOOGLE_RED
     color_name = "Red"
 
-# Statement (business_name may not exist yet on first load)
 biz_display = business_name if 'business_name' in locals() and business_name else "This business"
 if score == 100:
     statement = f"{biz_display} has a well-optimized Google Maps profile."
@@ -291,17 +290,14 @@ def format_address(addr):
     return truncate(addr, 30)
 
 def create_circular_progress(score, bar_color):
-    """2.5× larger circular progress bar, centered later in the PDF."""
-    size = 500  # 2.5 × original 200
+    """2.5× larger circular progress bar."""
+    size = 500
     center = size / 2
-    radius = 200  # 2.5 × original 80
-    stroke = 45   # 2.5 × original 18
+    radius = 200
+    stroke = 45
     d = Drawing(size, size)
-    # Thick outer circle
     d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
-    # Inner white circle
     d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    # Score text (scaled)
     d.add(String(center, center + 25, f"{score}", fontSize=70, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
     d.add(String(center, center - 30, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
@@ -312,7 +308,6 @@ def create_pdf_report():
     styles = getSampleStyleSheet()
     story = []
 
-    # Logo
     try:
         logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
         logo.hAlign = 'CENTER'
@@ -321,7 +316,6 @@ def create_pdf_report():
     except Exception:
         story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
 
-    # Two-line title
     title_style1 = ParagraphStyle('TitleLine1', parent=styles['Normal'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=14, spaceAfter=2)
     title_style2 = ParagraphStyle('TitleLine2', parent=styles['Heading1'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=16, spaceAfter=4)
     story.append(Paragraph("Local Visibility Report for", title_style1))
@@ -332,12 +326,11 @@ def create_pdf_report():
     story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # ========== CIRCULAR PROGRESS BAR (centered + 2.5× larger) ==========
+    # Circular Progress Bar (centered)
     story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
     story.append(Spacer(1, 0.1*inch))
 
     progress_drawing = create_circular_progress(score, bar_color)
-    # Center the drawing using a single-cell table
     progress_table = Table([[progress_drawing]], colWidths=[6.5*inch])
     progress_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -348,13 +341,21 @@ def create_pdf_report():
     story.append(progress_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # Statement
-    stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, spaceAfter=8)
+    # Statement — now bold
+    stmt_style = ParagraphStyle(
+        'Stmt',
+        parent=styles['Normal'],
+        alignment=TA_CENTER,
+        fontSize=12,
+        leading=15,
+        fontName='Helvetica-Bold',
+        spaceAfter=8
+    )
     story.append(Paragraph(statement, stmt_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Report Card results table
-    rc_data = [["Question", "Result"]]
+    # Report Card table — updated headers
+    rc_data = [["Google Maps Report Card", "Test Results"]]
     for q, result in st.session_state.report_card.items():
         rc_data.append([Paragraph(q, styles['Normal']), result])
     rc_table = Table(rc_data, colWidths=[5.2*inch, 1.3*inch])
@@ -371,7 +372,7 @@ def create_pdf_report():
     story.append(rc_table)
     story.append(Spacer(1, 0.25*inch))
 
-    # ========== HOW TO OPTIMIZE HEADING ==========
+    # HOW TO OPTIMIZE
     guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
@@ -414,12 +415,10 @@ def create_pdf_report():
     story.append(summary_table)
     story.append(Spacer(1, 0.2*inch))
 
-    # NAP
     story.append(Paragraph("<b>Business Details (NAP)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Top results table
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
@@ -453,17 +452,14 @@ def create_pdf_report():
         story.append(results_table)
         story.append(Spacer(1, 0.2*inch))
 
-    # Competitors
     story.append(Paragraph("<b>Top Competitors</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # AI Content
     story.append(Paragraph("<b>Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
     story.append(content_para)
 
-    # Google Maps link
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
@@ -533,5 +529,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-
-st.sidebar.info("Circular Progress Bar is now centered and 2.5× larger in the PDF.")
+st.sidebar.info("Statement under the Circular Progress Bar is bold. Report Card headers updated.")
