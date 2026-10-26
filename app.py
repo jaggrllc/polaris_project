@@ -253,10 +253,23 @@ def create_pdf_report():
         textColor=GOOGLE_BLUE,
         alignment=TA_CENTER,
         fontSize=16,
-        spaceAfter=10
+        spaceAfter=6
     )
     story.append(Paragraph("Local Visibility Report for", title_style1))
     story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
+
+    # Bold black preparation date under the title
+    date_style = ParagraphStyle(
+        'PrepDate',
+        parent=styles['Normal'],
+        textColor=colors.black,
+        alignment=TA_CENTER,
+        fontSize=11,
+        fontName='Helvetica-Bold',
+        spaceAfter=10
+    )
+    prepared_date = datetime.now().strftime("%B %d, %Y")
+    story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
     story.append(Spacer(1, 0.1*inch))
 
     # Google Maps logo + clickable link
@@ -267,7 +280,6 @@ def create_pdf_report():
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
 
-        # Google Maps logo above the link
         try:
             maps_logo = Image("google-maps-logo.png", width=1.2*inch, height=0.4*inch)
             maps_logo.hAlign = 'CENTER'
@@ -451,4 +463,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF title is now two lines and the Google Maps logo sits above the map link.")
+st.sidebar.info("PDF now shows the preparation date in bold black under the two-line title.")
