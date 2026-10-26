@@ -1,3 +1,12 @@
+**PDF limitation:** True interactive Google Maps iframes cannot be embedded inside a PDF (PDFs are static documents and do not support live iframes or JavaScript).
+
+### Practical solution added
+- A clear, clickable **“View on Google Maps”** hyperlink in the PDF that opens the same `/maps/search/` URL used by the button.
+- The link is styled in Google Blue and placed near the top of the report so the owner can tap/click it easily.
+
+Replace your entire `app.py` with this version (copy **only** the code):
+
+```python
 import streamlit as st
 import pandas as pd
 import serpapi
@@ -212,11 +221,9 @@ Keep it friendly and easy to follow. Do not invent facts about the business."""
                 st.error(f"Error: {e}")
 
 def format_address(addr):
-    """Stack street over city/state/zip when possible."""
     if not addr or not isinstance(addr, str):
         return ""
     addr = addr.strip()
-    # Simple split on comma (most common format)
     parts = [p.strip() for p in addr.split(",")]
     if len(parts) >= 2:
         street = truncate(parts[0], 28)
@@ -250,6 +257,27 @@ def create_pdf_report():
     )
     story.append(Paragraph(f"Local Visibility Report for {business_name}", title_style))
     story.append(Spacer(1, 0.1*inch))
+
+    # Clickable Google Maps link (closest practical substitute for an iframe)
+    if st.session_state.target_lat and st.session_state.target_lon:
+        name_encoded = quote_plus(business_name)
+        maps_url = (
+            f"https://www.google.com/maps/search/{name_encoded}/"
+            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
+        )
+        link_style = ParagraphStyle(
+            'MapLink',
+            parent=styles['Normal'],
+            textColor=GOOGLE_BLUE,
+            fontSize=12,
+            alignment=TA_CENTER,
+            spaceAfter=10
+        )
+        story.append(Paragraph(
+            f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>',
+            link_style
+        ))
+        story.append(Spacer(1, 0.1*inch))
 
     guide_style = ParagraphStyle(
         'Guide',
@@ -304,14 +332,12 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Top results table with truncated titles and stacked addresses
+    # Top results table
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
 
-        # Build table with Paragraphs for multi-line support
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
-
         cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
 
         for _, row in st.session_state.df.iterrows():
@@ -414,4 +440,12 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF tables now trim long titles and stack street address over city/state/zip.")
+st.sidebar.info("PDF includes a clickable Google Maps link (true iframes are not possible inside PDFs).")
+```
+
+**What you get**
+- A blue, underlined **“View on Google Maps”** link near the top of the PDF.
+- Clicking/tapping it opens the same `/maps/search/` URL that the in-app button uses.
+- All previous formatting (truncated titles, stacked addresses, logo, colors, tables) remains.
+
+Update the file on GitHub and redeploy. The PDF now has a practical, clickable map link since live iframes cannot be embedded in PDF files.
