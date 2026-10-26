@@ -12,7 +12,7 @@ import re
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Local visibility, competitor insight, and AI content tools. Original implementation.")
+st.caption("Local visibility check, competitor insight, and AI content tools. Original implementation.")
 
 def get_secret(name: str, label: str):
     try:
@@ -48,6 +48,8 @@ if "results_ready" not in st.session_state:
     st.session_state.visibility_score = None
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
+    st.session_state.keywords = ""
+    st.session_state.website_tips = ""
 
 col1, col2 = st.columns(2)
 with col1:
@@ -62,7 +64,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
     if not business_name or not keyword or not location_input:
         st.error("Please provide a business name, keyword, and a location.")
     else:
-        with st.spinner("Running audit..."):
+        with st.spinner("Running audit and generating insights..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
                 params = {
@@ -125,20 +127,38 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
 
                     summary = df.to_string(index=False)
-                    prompt = f"""You are a local SEO advisor. Analyze results for "{keyword}" near {location_input}.
+                    prompt = f"""You are a practical local SEO advisor. Analyze results for "{keyword}" near {location_input}.
 Target business: {business_name}
-Found in results: {target_found}
+Found: {target_found}
 Position: {target_position}
 Top results:
 {summary}
-Top competitors:
+Competitors:
 {comp_text}
 
-Provide:
-1. A practical 5-8 bullet action plan.
-2. One ready-to-use sample Google Business Profile post.
-3. A short outline for a local service page (3-4 headings with one-sentence descriptions).
-Keep language simple and realistic. Do not invent data."""
+Respond in clear sections:
+
+1. ACTION PLAN
+5-8 practical bullet points.
+
+2. SAMPLE GOOGLE BUSINESS PROFILE POST
+One ready-to-use post (3-5 sentences) with a call to action.
+
+3. LOCAL PAGE OUTLINE
+3-4 headings with a one-sentence description each.
+
+4. SHORT ARTICLE SNIPPET
+A 120-150 word sample paragraph a local page could use.
+
+5. WEBSITE IMPROVEMENT TIPS
+3-5 specific, realistic tips.
+
+6. REVIEW RESPONSE IDEAS
+Two short example responses (one positive, one neutral/negative).
+
+7. SUGGESTED KEYWORDS
+5 related keywords or phrases to target.
+Do not invent data. Keep everything concise and useful."""
 
                     oai = OpenAI(api_key=openai_key)
                     completion = oai.chat.completions.create(
@@ -147,15 +167,13 @@ Keep language simple and realistic. Do not invent data."""
                         temperature=0.4,
                     )
                     full_ai = completion.choices[0].message.content
-                    plan = full_ai.split("2.")[0] if "2." in full_ai else full_ai
-                    sample_content = full_ai
 
                     st.session_state.update({
                         "results_ready": True,
                         "df": df,
                         "target_found": target_found,
                         "target_position": target_position,
-                        "plan": plan,
+                        "plan": full_ai,
                         "target_lat": target_lat,
                         "target_lon": target_lon,
                         "target_address": target_address,
@@ -163,7 +181,7 @@ Keep language simple and realistic. Do not invent data."""
                         "auto_nap": f"Name: {business_name}\nAddress: {target_address or 'N/A'}\nPhone: {target_phone or 'N/A'}",
                         "visibility_score": visibility_score,
                         "competitors": comp_text,
-                        "sample_content": sample_content,
+                        "sample_content": full_ai,
                     })
 
             except Exception as e:
@@ -210,10 +228,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Top Competitors")
     st.text(st.session_state.competitors)
 
-    st.subheader("AI Action Plan")
-    st.markdown(st.session_state.plan)
-
-    st.subheader("Sample Content (GBP Post + Page Outline)")
+    st.subheader("AI Insights & Content Tools")
     st.markdown(st.session_state.sample_content)
 
     report = f"""AI Local Map Auditor Report
@@ -234,9 +249,9 @@ Top 5 Local Results:
 Competitors:
 {st.session_state.competitors}
 
-AI Insights:
+AI Insights & Content:
 {st.session_state.sample_content}
 """
-    st.download_button("Download Report", report, file_name="local_audit_report.txt", mime="text/plain")
+    st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("Original tools inspired by common local SEO practices. No proprietary technology used.")
+st.sidebar.info("Expanded original tools for local visibility, content, and recommendations.")
