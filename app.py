@@ -290,19 +290,14 @@ def format_address(addr):
     return truncate(addr, 30)
 
 def create_circular_progress(score, bar_color):
-    """Circular progress bar with score number twice as large."""
     size = 500
     center = size / 2
     radius = 200
     stroke = 45
     d = Drawing(size, size)
-    # Thick outer circle
     d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
-    # Inner white circle
     d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    # Score number — now twice the previous size (140)
     d.add(String(center, center + 15, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    # "out of 100" text below
     d.add(String(center, center - 55, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
 
@@ -411,7 +406,8 @@ def create_pdf_report():
     story.append(Spacer(1, 0.15*inch))
 
     if st.session_state.df is not None and not st.session_state.df.empty:
-        story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
+        # Changed heading
+        story.append(Paragraph("<b>Top Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
         cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
@@ -521,4 +517,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Score number inside the Circular Progress Bar is now twice as large.")
+st.sidebar.info("PDF heading updated to Top Local Results.")
