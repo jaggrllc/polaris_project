@@ -46,6 +46,17 @@ def truncate(text, length=30):
         return text
     return text[:length].rstrip() + "..."
 
+def get_current_season():
+    month = datetime.now().month
+    if month in (12, 1, 2):
+        return "Winter"
+    elif month in (3, 4, 5):
+        return "Spring"
+    elif month in (6, 7, 8):
+        return "Summer"
+    else:
+        return "Fall"
+
 # Google brand colors
 GOOGLE_BLUE = colors.HexColor("#4285F4")
 GOOGLE_RED = colors.HexColor("#EA4335")
@@ -83,7 +94,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
     if not business_name or not keyword or not location_input:
         st.error("Please provide a business name, keyword, and a location.")
     else:
-        with st.spinner("Running audit and creating PDF report..."):
+        with st.spinner("Running audit and creating seasonal content..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
                 params = {
@@ -145,11 +156,13 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     competitors = Counter(titles).most_common(5)
                     comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
 
+                    current_season = get_current_season()
                     summary = df.to_string(index=False)
                     prompt = f"""You are helping a local business owner who is not very comfortable with computers.
 Business: {business_name}
 Keyword: {keyword}
 Location: {location_input}
+Current Season: {current_season}
 Found in Google results: {target_found}
 Position: {target_position}
 Top results:
@@ -168,7 +181,10 @@ Create these sections:
 A short description (under 750 characters) they can copy and paste into their Google Business Profile.
 
 3. THREE READY-TO-POST UPDATES
-Three short posts they can add to their Google Business Profile. Label them clearly (Post 1, Post 2, Post 3).
+Create three short posts that are timely for the current season ({current_season}). 
+Make them relevant to seasonal changes, weather, or customer needs right now 
+(for example: spring cleanup, summer watering tips, fall leaf removal, winter prep, holiday offers, etc.). 
+Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
 
 4. SUGGESTED CATEGORIES
 Primary category and a few extra ones to add.
@@ -229,7 +245,6 @@ def create_pdf_report():
     styles = getSampleStyleSheet()
     story = []
 
-    # Jaguar Group logo
     try:
         logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
         logo.hAlign = 'CENTER'
@@ -238,7 +253,6 @@ def create_pdf_report():
     except Exception:
         story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
 
-    # Two-line title
     title_style1 = ParagraphStyle(
         'TitleLine1',
         parent=styles['Normal'],
@@ -258,7 +272,6 @@ def create_pdf_report():
     story.append(Paragraph("Local Visibility Report for", title_style1))
     story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
 
-    # Bold black preparation date under the title
     date_style = ParagraphStyle(
         'PrepDate',
         parent=styles['Normal'],
@@ -272,7 +285,6 @@ def create_pdf_report():
     story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Google Maps logo + clickable link
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = (
@@ -325,7 +337,6 @@ def create_pdf_report():
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
-    # Summary table
     summary_data = [
         ["Field", "Value"],
         ["Business", business_name],
@@ -350,12 +361,10 @@ def create_pdf_report():
     story.append(summary_table)
     story.append(Spacer(1, 0.2*inch))
 
-    # NAP
     story.append(Paragraph("<b>Business Details (NAP)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Top results table
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
 
@@ -392,12 +401,10 @@ def create_pdf_report():
         story.append(results_table)
         story.append(Spacer(1, 0.2*inch))
 
-    # Competitors
     story.append(Paragraph("<b>Top Competitors</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # AI Content
     story.append(Paragraph("<b>Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
     story.append(content_para)
@@ -463,4 +470,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF now shows the preparation date in bold black under the two-line title.")
+st.sidebar.info("The three ready-to-post updates are now generated for the current season.")
