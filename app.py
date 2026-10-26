@@ -59,15 +59,15 @@ def get_current_season():
         return "Fall"
 
 def clean_ai_content(text):
-    """Clean AI content and force clean section headings."""
+    """Clean AI content while preserving icons under post headings."""
     if not text:
         return ""
-    # Convert **bold** to real bold
+    # Convert **bold** to real bold (preserve any icons inside)
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # Remove ### and any H-style prefixes
+    # Remove ### and H-style prefixes
     text = re.sub(r'#+\s*', '', text)
     text = re.sub(r'(?i)^h[1-6]\.?\s*', '', text, flags=re.MULTILINE)
-    # Force the exact section headings the user wants
+    # Force clean main section headings
     replacements = {
         r'(?i)1\.?\s*ACTION PLAN': '1. ACTION PLAN',
         r'(?i)2\.?\s*NEW BUSINESS DESCRIPTION': '2. NEW BUSINESS DESCRIPTION',
@@ -79,20 +79,24 @@ def clean_ai_content(text):
     }
     for pattern, replacement in replacements.items():
         text = re.sub(pattern, replacement, text)
-    # Replace only the sub-steps (not the main section numbers) with stars
-    # This targets lines that start with a number followed by a period and space, but not the main section titles
+    # Process lines: keep post headings and icons, convert only plain numbered steps to stars
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
         stripped = line.strip()
+        # Preserve main section titles
         if re.match(r'^[1-7]\.\s+(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
             cleaned_lines.append(stripped)
-        elif re.match(r'^\d+\.\s+', stripped):
+        # Preserve Post 1 / Post 2 / Post 3 headings and anything under them (including icons)
+        elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
+            cleaned_lines.append(line)
+        # Convert ordinary numbered steps to stars (but leave post content alone)
+        elif re.match(r'^\d+\.\s+', stripped) and not any(x in stripped.lower() for x in ['post ', 'fall', 'clean-up', 'winter', 'spring', 'summer']):
             cleaned_lines.append('★ ' + re.sub(r'^\d+\.\s+', '', stripped))
         else:
             cleaned_lines.append(line)
     text = '\n'.join(cleaned_lines)
-    # Final cleanup
+    # Final light cleanup (do not strip Unicode icons)
     text = text.replace('**', '').replace('###', '')
     text = text.replace('\n', '<br/>')
     return text
@@ -274,6 +278,7 @@ A short description (under 750 characters) they can copy and paste into their Go
 Create three short posts that are timely for the current season ({current_season}). 
 Make them relevant to seasonal changes, weather, or customer needs right now. 
 Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
+You may include simple icons or emojis under each post if they help the owner.
 
 4. SUGGESTED CATEGORIES
 Primary category and a few extra ones to add.
@@ -497,7 +502,7 @@ def create_pdf_report():
         story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
         story.append(Spacer(1, 0.15*inch))
 
-    # DIY heading + cleaned content
+    # DIY heading + cleaned content (icons under posts are preserved)
     story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     cleaned_content = clean_ai_content(st.session_state.sample_content)
     content_para = Paragraph(cleaned_content, styles['Normal'])
@@ -558,5 +563,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-
-st.sidebar.info("DIY section headings now appear exactly as 1. ACTION PLAN, 2. NEW BUSINESS DESCRIPTION, etc. (no H prefix).")
+st.sidebar.info("Icons under Post 1 / Post 2 / Post 3 headings are now preserved and appear in the PDF.")) that appear on the Streamlit page should now also appear in the downloaded PDF Report Card.
