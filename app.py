@@ -324,7 +324,7 @@ def create_pdf_report():
     )
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
-    1. Open Google Maps on your phone or computer.<br/>
+    1. Open Google Maps on your smartphone, tablet, or computer.<br/>
     2. Search for your business name.<br/>
     3. Tap or click on your business.<br/>
     4. Look for “Edit profile” or “Manage this business” and open it.<br/>
@@ -470,4 +470,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Heading updated to HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE.")
+st.sidebar.info("Guide step updated to include smartphone, tablet, or computer.")
