@@ -192,7 +192,7 @@ Primary category and a few extra ones to add.
 5 simple photo ideas.
 
 6. HOW TO REPLY TO REVIEWS
-One sample reply for a good review and one for a negative review.
+One sample reply for a good review and one for a so-so review.
 
 7. EXTRA KEYWORDS
 A few related words or phrases they should use.
