@@ -304,4 +304,3 @@ AI Insights:
     st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
 st.sidebar.info("Name matching is more flexible. Coordinates are captured from results or fall back to search center.")
-Update the file on GitHub and redeploy. The “coordinates not available” message should now appear much less often.
