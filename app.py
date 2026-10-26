@@ -325,14 +325,15 @@ def create_pdf_report():
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
     1. Open Google Maps on your smartphone, tablet, or computer.<br/>
-    2. Search for your business name.<br/>
-    3. Tap or click on your business.<br/>
-    4. Look for “Edit profile” or “Manage this business” and open it.<br/>
-    5. Copy the New Business Description below and paste it into the description box.<br/>
-    6. To add a post: look for “Add update” or “Create post”, then copy one of the three posts and paste it.<br/>
-    7. Add any suggested categories if you see the option.<br/>
-    8. Take or upload photos based on the photo ideas.<br/>
-    9. When customers leave reviews, use the sample replies as a guide.
+    2. Search for your business name and tap or click on it.<br/>
+    3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
+    4. If asked, sign in with the Google account that owns the business.<br/>
+    5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
+    6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
+    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
+    8. Add any suggested categories if the option is available.<br/>
+    9. Upload photos based on the photo ideas.<br/>
+    10. When customers leave reviews, use the sample replies as a guide.
     """
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
@@ -470,4 +471,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Guide step updated to include smartphone, tablet, or computer.")
+st.sidebar.info("Guide now includes clearer steps to open Google Business Profile and click Edit.")
