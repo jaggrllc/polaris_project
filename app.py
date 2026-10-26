@@ -556,4 +556,3 @@ if st.session_state.results_ready and st.session_state.df is not None:
     )
 
 st.sidebar.info("Download button renamed to Download Google Maps Profile Report Card.")
-Update the file on GitHub and redeploy.
