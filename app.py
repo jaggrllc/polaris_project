@@ -292,13 +292,14 @@ def create_pdf_report():
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
 
+        # Google Maps logo — now 3x larger
         try:
-            maps_logo = Image("google-maps-logo.png", width=1.2*inch, height=0.4*inch)
+            maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
             maps_logo.hAlign = 'CENTER'
             story.append(maps_logo)
-            story.append(Spacer(1, 0.05*inch))
+            story.append(Spacer(1, 0.08*inch))
         except Exception:
-            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE)))
+            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE, fontSize=16)))
 
         link_style = ParagraphStyle(
             'MapLink',
@@ -471,4 +472,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Guide now includes clearer steps to open Google Business Profile and click Edit.")
+st.sidebar.info("Google Maps logo is now three times larger in the PDF.")
