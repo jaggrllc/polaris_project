@@ -57,7 +57,6 @@ def get_current_season():
     else:
         return "Fall"
 
-# Google brand colors
 GOOGLE_BLUE = colors.HexColor("#4285F4")
 GOOGLE_RED = colors.HexColor("#EA4335")
 GOOGLE_YELLOW = colors.HexColor("#FBBC05")
@@ -292,20 +291,20 @@ def create_pdf_report():
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
 
-        # Google Maps logo — now 3x larger
+        # Google Maps logo — 3x larger (3.6" × 1.2")
         try:
             maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
             maps_logo.hAlign = 'CENTER'
             story.append(maps_logo)
-            story.append(Spacer(1, 0.08*inch))
+            story.append(Spacer(1, 0.1*inch))
         except Exception:
-            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE, fontSize=16)))
+            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE, fontSize=18)))
 
         link_style = ParagraphStyle(
             'MapLink',
             parent=styles['Normal'],
             textColor=GOOGLE_BLUE,
-            fontSize=11,
+            fontSize=12,
             alignment=TA_CENTER,
             spaceAfter=8
         )
@@ -331,7 +330,7 @@ def create_pdf_report():
     4. If asked, sign in with the Google account that owns the business.<br/>
     5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-    7. To add a post, find the “Add update” or “Create post” button, then copy and paste one of the “THREE READY-TO-POST UPDATES” posts below.<br/>
+    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
     8. Add any suggested categories if the option is available.<br/>
     9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
@@ -472,4 +471,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Google Maps logo is now three times larger in the PDF.")
+st.sidebar.info("Google Maps logo is set to 3.6 inches wide × 1.2 inches tall (3× original size).")
