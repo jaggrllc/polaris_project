@@ -47,8 +47,8 @@ with col2:
     location_input = st.text_input("Search Location (city)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Search Center Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Search Center Longitude (optional)", value=0.0, format="%.6f")
-    biz_lat = st.number_input("Business Latitude (optional override)", value=0.0, format="%.6f")
-    biz_lon = st.number_input("Business Longitude (optional override)", value=0.0, format="%.6f")
+    biz_lat = st.number_input("Business Latitude (optional override)", value=0.0, format="%.6f", key="biz_lat_input")
+    biz_lon = st.number_input("Business Longitude (optional override)", value=0.0, format="%.6f", key="biz_lon_input")
 
 do_grid = st.checkbox("Run simple 3-point visibility check (uses extra SerpAPI credits)", value=False)
 zoom = st.slider("Map Zoom (for ll)", 10, 18, 14)
@@ -109,14 +109,17 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
                         })
+                        # Auto-capture coordinates and NAP on name match
                         if business_name.lower() in str(item.get("title") or "").lower():
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
                             target_phone = phone
 
-                    if biz_lat and biz_lon:
-                        target_lat, target_lon = biz_lat, biz_lon
+                    # Overrides only if user filled them
+                    if st.session_state.get("biz_lat_input", 0) != 0 and st.session_state.get("biz_lon_input", 0) != 0:
+                        target_lat = st.session_state.biz_lat_input
+                        target_lon = st.session_state.biz_lon_input
                     if business_address.strip():
                         target_address = business_address.strip()
                     if business_phone.strip():
@@ -184,20 +187,20 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Top 5 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
-    if st.session_state.target_lat:
-        st.success("Auto-captured NAP:")
-        st.code(st.session_state.auto_nap)
+    if st.session_state.target_lat and st.session_state.target_lon:
+        st.success("Auto-captured NAP and Coordinates:")
+        st.code(f"{st.session_state.auto_nap}\nLatitude: {st.session_state.target_lat}\nLongitude: {st.session_state.target_lon}")
 
-    # GO TO business button
+    # Automated GO TO button
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote(business_name)
         maps_url = (
             f"https://www.google.com/maps/place/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
-        st.link_button(f"Go to {business_name}", maps_url, type="primary")
+        st.link_button(f"GO to {business_name}", maps_url, type="primary")
     else:
-        st.info("Coordinates needed to generate the Go to business link.")
+        st.info("Business not found in results — no coordinates available for the GO link. Try a more precise search or enter override coordinates.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -256,4 +259,4 @@ AI Insights:
 """
     st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("Simple 3-point check uses extra credits. All features are original implementations.")
+st.sidebar.info("Coordinates for the GO link are captured automatically when the business appears in results.")
