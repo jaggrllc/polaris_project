@@ -1,12 +1,3 @@
-**PDF limitation:** True interactive Google Maps iframes cannot be embedded inside a PDF (PDFs are static documents and do not support live iframes or JavaScript).
-
-### Practical solution added
-- A clear, clickable **“View on Google Maps”** hyperlink in the PDF that opens the same `/maps/search/` URL used by the button.
-- The link is styled in Google Blue and placed near the top of the report so the owner can tap/click it easily.
-
-Replace your entire `app.py` with this version (copy **only** the code):
-
-```python
 import streamlit as st
 import pandas as pd
 import serpapi
@@ -441,11 +432,3 @@ if st.session_state.results_ready and st.session_state.df is not None:
     )
 
 st.sidebar.info("PDF includes a clickable Google Maps link (true iframes are not possible inside PDFs).")
-```
-
-**What you get**
-- A blue, underlined **“View on Google Maps”** link near the top of the PDF.
-- Clicking/tapping it opens the same `/maps/search/` URL that the in-app button uses.
-- All previous formatting (truncated titles, stacked addresses, logo, colors, tables) remains.
-
-Update the file on GitHub and redeploy. The PDF now has a practical, clickable map link since live iframes cannot be embedded in PDF files.
