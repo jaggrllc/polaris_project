@@ -290,7 +290,6 @@ def format_address(addr):
     return truncate(addr, 30)
 
 def create_circular_progress(score, bar_color):
-    """2.5× larger circular progress bar."""
     size = 500
     center = size / 2
     radius = 200
@@ -321,9 +320,10 @@ def create_pdf_report():
     story.append(Paragraph("Local Visibility Report for", title_style1))
     story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
 
+    # Updated preparation line
     date_style = ParagraphStyle('PrepDate', parent=styles['Normal'], textColor=colors.black, alignment=TA_CENTER, fontSize=11, fontName='Helvetica-Bold', spaceAfter=8)
     prepared_date = datetime.now().strftime("%B %d, %Y")
-    story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
+    story.append(Paragraph(f"This report was prepared by Jaguar Group LLC on {prepared_date}.", date_style))
     story.append(Spacer(1, 0.1*inch))
 
     # Circular Progress Bar (centered)
@@ -341,20 +341,12 @@ def create_pdf_report():
     story.append(progress_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # Statement — now bold
-    stmt_style = ParagraphStyle(
-        'Stmt',
-        parent=styles['Normal'],
-        alignment=TA_CENTER,
-        fontSize=12,
-        leading=15,
-        fontName='Helvetica-Bold',
-        spaceAfter=8
-    )
+    # Bold statement
+    stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, fontName='Helvetica-Bold', spaceAfter=8)
     story.append(Paragraph(statement, stmt_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Report Card table — updated headers
+    # Report Card table
     rc_data = [["Google Maps Report Card", "Test Results"]]
     for q, result in st.session_state.report_card.items():
         rc_data.append([Paragraph(q, styles['Normal']), result])
@@ -529,4 +521,5 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-st.sidebar.info("Statement under the Circular Progress Bar is bold. Report Card headers updated.")
+
+st.sidebar.info("Preparation line updated to include Jaguar Group LLC.")
