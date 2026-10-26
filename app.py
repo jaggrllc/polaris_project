@@ -259,5 +259,3 @@ AI Insights & Content:
     st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
 st.sidebar.info("The GO to Business link now uses /maps/search/ so it redirects to the final destination page.")
-
-Update the file on GitHub and redeploy. The link should now redirect correctly.
