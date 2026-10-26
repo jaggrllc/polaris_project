@@ -16,7 +16,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.graphics.shapes import Drawing, Circle, String
-from reportlab.graphics import renderPDF
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -121,12 +120,14 @@ else:
     bar_color = GOOGLE_RED
     color_name = "Red"
 
+# Statement (business_name may not exist yet on first load)
+biz_display = business_name if 'business_name' in locals() and business_name else "This business"
 if score == 100:
-    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a well-optimized Google Maps profile."
+    statement = f"{biz_display} has a well-optimized Google Maps profile."
 elif score in (80, 90):
-    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a Google Maps profile that need improvement."
+    statement = f"{biz_display} has a Google Maps profile that need improvement."
 else:
-    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a poorly-optimized Google Maps profile."
+    statement = f"{biz_display} has a poorly-optimized Google Maps profile."
 
 st.metric("Current Report Card Score", f"{score} out of 100", help=f"Border color: {color_name}")
 st.info(statement)
@@ -290,15 +291,19 @@ def format_address(addr):
     return truncate(addr, 30)
 
 def create_circular_progress(score, bar_color):
-    """Create a simple circular progress indicator for the PDF."""
-    d = Drawing(200, 200)
+    """2.5× larger circular progress bar, centered later in the PDF."""
+    size = 500  # 2.5 × original 200
+    center = size / 2
+    radius = 200  # 2.5 × original 80
+    stroke = 45   # 2.5 × original 18
+    d = Drawing(size, size)
     # Thick outer circle
-    d.add(Circle(100, 100, 80, strokeColor=bar_color, strokeWidth=18, fillColor=colors.white))
+    d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
     # Inner white circle
-    d.add(Circle(100, 100, 55, strokeColor=colors.white, fillColor=colors.white))
-    # Score text
-    d.add(String(100, 105, f"{score}", fontSize=28, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(100, 80, "out of 100", fontSize=12, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
+    d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
+    # Score text (scaled)
+    d.add(String(center, center + 25, f"{score}", fontSize=70, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(center, center - 30, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
 
 def create_pdf_report():
@@ -327,18 +332,25 @@ def create_pdf_report():
     story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # ========== CIRCULAR PROGRESS BAR + STATEMENT + REPORT CARD ==========
+    # ========== CIRCULAR PROGRESS BAR (centered + 2.5× larger) ==========
     story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
     story.append(Spacer(1, 0.1*inch))
 
-    # Circular progress
     progress_drawing = create_circular_progress(score, bar_color)
-    story.append(progress_drawing)
-    story.append(Spacer(1, 0.1*inch))
+    # Center the drawing using a single-cell table
+    progress_table = Table([[progress_drawing]], colWidths=[6.5*inch])
+    progress_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(progress_table)
+    story.append(Spacer(1, 0.15*inch))
 
     # Statement
     stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, spaceAfter=8)
-    story.append(Paragraph(statement.replace("**", ""), stmt_style))
+    story.append(Paragraph(statement, stmt_style))
     story.append(Spacer(1, 0.1*inch))
 
     # Report Card results table
@@ -522,4 +534,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Report Card with Circular Progress Bar is now included. Tick PASS/FAIL and generate the PDF.")
+st.sidebar.info("Circular Progress Bar is now centered and 2.5× larger in the PDF.")
