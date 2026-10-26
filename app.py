@@ -7,6 +7,7 @@ from streamlit_folium import st_folium
 from datetime import datetime
 from collections import Counter
 from urllib.parse import quote
+import re
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -19,10 +20,18 @@ def get_secret(name: str, label: str):
     except Exception:
         return st.sidebar.text_input(label, type="password")
 
+def clean_name(name):
+    """Normalize business name for better matching."""
+    if not name:
+        return ""
+    name = name.lower()
+    name = re.sub(r'\b(llc|inc|ltd|co|company)\b', '', name)
+    name = re.sub(r'[^a-z0-9\s]', '', name)
+    return " ".join(name.split())
+
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
 
-# Initialize session state for auto-populated coordinates
 if "results_ready" not in st.session_state:
     st.session_state.results_ready = False
     st.session_state.df = None
@@ -50,7 +59,6 @@ with col2:
     location_input = st.text_input("Search Location (city)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Search Center Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Search Center Longitude (optional)", value=0.0, format="%.6f")
-    # Auto-populated fields (values come from session_state after audit)
     biz_lat = st.number_input(
         "Business Latitude (auto-filled when found)",
         value=st.session_state.biz_lat_input,
@@ -109,13 +117,16 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     rows = []
                     target_lat = target_lon = None
                     target_address = target_phone = ""
+                    cleaned_target = clean_name(business_name)
 
-                    for item in main_local[:5]:
+                    # Look deeper (top 15) for better matching
+                    for item in main_local[:15]:
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
+                        title = item.get("title") or ""
                         rows.append({
                             "Position": item.get("position"),
-                            "Title": item.get("title"),
+                            "Title": title,
                             "Rating": item.get("rating"),
                             "Reviews": item.get("reviews"),
                             "Address": item.get("address"),
@@ -123,13 +134,14 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
                         })
-                        if business_name.lower() in str(item.get("title") or "").lower():
+                        # Flexible name match
+                        if cleaned_target and cleaned_target in clean_name(title):
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
                             target_phone = phone
 
-                    # Prefer user override only if they changed it from 0
+                    # User overrides
                     if st.session_state.biz_lat_input != 0.0 and st.session_state.biz_lon_input != 0.0:
                         target_lat = st.session_state.biz_lat_input
                         target_lon = st.session_state.biz_lon_input
@@ -138,19 +150,28 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     if business_phone.strip():
                         target_phone = business_phone.strip()
 
-                    # Auto-populate the input fields for next run / display
+                    # Fallback to search center if still no coordinates
+                    if not target_lat and lat != 0.0:
+                        target_lat = lat
+                        target_lon = lon
+
                     if target_lat and target_lon:
                         st.session_state.biz_lat_input = float(target_lat)
                         st.session_state.biz_lon_input = float(target_lon)
 
-                    df = pd.DataFrame(rows)
-                    target_found = any(business_name.lower() in str(r.get("title") or "").lower() for r in main_local)
-                    target_position = next((r.get("position") for r in main_local if business_name.lower() in str(r.get("title") or "").lower()), None)
+                    # Display only top 5 in the table
+                    df = pd.DataFrame(rows[:5])
+                    target_found = any(cleaned_target in clean_name(str(r.get("title") or "")) for r in main_local)
+                    target_position = next(
+                        (r.get("position") for r in main_local
+                         if cleaned_target in clean_name(str(r.get("title") or ""))),
+                        None
+                    )
 
                     top3_count = 0
                     for _, locs in point_results:
                         for item in locs[:3]:
-                            if business_name.lower() in str(item.get("title") or "").lower():
+                            if cleaned_target in clean_name(str(item.get("title") or "")):
                                 top3_count += 1
                                 break
                     visibility_score = round((top3_count / len(points)) * 100) if points else 0
@@ -213,7 +234,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
             f"Longitude: {st.session_state.target_lon}"
         )
 
-    # GO TO button with auto-populated coordinates in the URL
+    # GO TO button — now much more likely to have coordinates
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote(business_name)
         maps_url = (
@@ -221,9 +242,9 @@ if st.session_state.results_ready and st.session_state.df is not None:
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
-        st.caption(f"URL uses auto-populated coordinates: {st.session_state.target_lat}, {st.session_state.target_lon}")
+        st.caption(f"URL uses coordinates: {st.session_state.target_lat}, {st.session_state.target_lon}")
     else:
-        st.info("Business not found in results — coordinates not available yet.")
+        st.info("Could not determine coordinates. Try entering Search Center Latitude/Longitude or a more specific keyword.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -233,7 +254,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
                        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google Maps")
 
         for _, row in map_df.iterrows():
-            if business_name.lower() not in str(row["Title"]).lower():
+            if clean_name(business_name) not in clean_name(str(row["Title"])):
                 folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Title"],
                               icon=folium.Icon(color="blue")).add_to(m)
 
@@ -282,4 +303,5 @@ AI Insights:
 """
     st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("Business Latitude and Longitude are auto-populated from results and used in the GO to Business URL.")
+st.sidebar.info("Name matching is more flexible. Coordinates are captured from results or fall back to search center.")
+Update the file on GitHub and redeploy. The “coordinates not available” message should now appear much less often.
