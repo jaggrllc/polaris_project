@@ -120,7 +120,7 @@ if "results_ready" not in st.session_state:
 
 # ---------- REPORT CARD QUESTIONS ----------
 st.subheader("Google Maps Profile Report Card")
-st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10. Answers auto-fill after Run Audit.")
+st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10. Answers and radios auto-fill after Run Audit.")
 
 questions = [
     "1. Is the Business Details (NAP) correctly listed?",
@@ -135,21 +135,22 @@ questions = [
     "10. Are there any duplicate business listings for the same business?",
 ]
 
-# Auto answers text box (fills after Run Audit)
-auto_answers_placeholder = st.empty()
+# Auto answers text box
 if st.session_state.get("auto_answers"):
-    auto_answers_placeholder.text_area("Automated Answers (filled after Run Audit)", value=st.session_state.auto_answers, height=220, disabled=True)
+    st.text_area("Automated Answers (filled after Run Audit)", value=st.session_state.auto_answers, height=220, disabled=True)
 else:
-    auto_answers_placeholder.text_area("Automated Answers (will appear here after Run Audit)", value="", height=220, disabled=True)
+    st.text_area("Automated Answers (will appear here after Run Audit)", value="", height=220, disabled=True)
 
+# Radio buttons – auto-select based on auto_scores after audit
 report_card = {}
 cols = st.columns(2)
 for i, q in enumerate(questions):
-    default_idx = 1  # FAIL by default
+    default_idx = 1
     if st.session_state.get("auto_scores") and q in st.session_state.auto_scores:
         default_idx = 0 if st.session_state.auto_scores[q] == "PASS" else 1
     with cols[i % 2]:
-        report_card[q] = st.radio(q, ["PASS", "FAIL"], index=default_idx, horizontal=True, key=f"q{i}")
+        selected = st.radio(q, ["PASS", "FAIL"], index=default_idx, horizontal=True, key=f"q{i}")
+        report_card[q] = selected
 
 st.session_state.report_card = report_card
 
@@ -256,7 +257,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     competitors = Counter(titles).most_common(5)
                     comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
 
-                    # ========== AUTOMATED SCORING ==========
+                    # ========== AUTOMATED SCORING (Google/SerpAPI data) ==========
                     auto_scores = {}
                     answers_list = []
 
@@ -286,11 +287,11 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         # 5. Services listed
                         has_services = bool(target_item.get("service_options") or target_item.get("extensions"))
                         auto_scores[questions[4]] = "PASS" if has_services else "FAIL"
-                        answers_list.append(f"5. Services listed: {'PASS' if has_services else 'FAIL'} (limited data from local results)")
+                        answers_list.append(f"5. Services listed: {'PASS' if has_services else 'FAIL'} (from available fields)")
 
-                        # 6. Owner responses (estimated – full check needs reviews engine)
-                        auto_scores[questions[5]] = "FAIL"  # conservative default
-                        answers_list.append("6. Owner responses: FAIL (requires deeper review scrape – estimated)")
+                        # 6. Owner responses (estimated – full check needs google_maps_reviews)
+                        auto_scores[questions[5]] = "FAIL"
+                        answers_list.append("6. Owner responses: FAIL (estimated – deeper review scrape recommended)")
 
                         # 7. Active website
                         has_website = bool(target_item.get("links", {}).get("website") or target_item.get("website"))
@@ -306,7 +307,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
 
                         # 9. NAP matches website (estimated)
                         auto_scores[questions[8]] = "FAIL"
-                        answers_list.append("9. NAP matches website: FAIL (requires website crawl – estimated)")
+                        answers_list.append("9. NAP matches website: FAIL (estimated – website crawl needed)")
 
                         # 10. Duplicate listings
                         similar = sum(1 for t in titles if normalize(t) == norm_target)
@@ -635,4 +636,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Report Card questions now auto-score after Run Audit using SerpAPI data. Answers appear in the text box above the questions.")
+st.sidebar.info("Report Card now auto-scores from Google/SerpAPI data after Run Audit. Radios tick automatically and answers fill the text box.")
