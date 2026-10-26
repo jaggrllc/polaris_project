@@ -8,11 +8,18 @@ from datetime import datetime
 from collections import Counter
 from urllib.parse import quote_plus
 import re
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Local visibility check + ready-to-use Google Business Profile content. Original tool.")
+st.caption("Local visibility check + owner-friendly PDF reports. Original tool.")
 
 def get_secret(name: str, label: str):
     try:
@@ -30,6 +37,12 @@ def normalize(name):
     name = re.sub(r'\s+', ' ', name).strip()
     name = name.replace("landscaping", "landscape")
     return name
+
+# Google brand colors
+GOOGLE_BLUE = colors.HexColor("#4285F4")
+GOOGLE_RED = colors.HexColor("#EA4335")
+GOOGLE_YELLOW = colors.HexColor("#FBBC05")
+GOOGLE_GREEN = colors.HexColor("#34A853")
 
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
@@ -62,7 +75,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
     if not business_name or not keyword or not location_input:
         st.error("Please provide a business name, keyword, and a location.")
     else:
-        with st.spinner("Running audit and creating owner-friendly content..."):
+        with st.spinner("Running audit and creating PDF report..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
                 params = {
@@ -190,6 +203,118 @@ Keep it friendly and easy to follow. Do not invent facts about the business."""
             except Exception as e:
                 st.error(f"Error: {e}")
 
+def create_pdf_report():
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Logo (1 inch x 1 inch, centered)
+    try:
+        logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
+        logo.hAlign = 'CENTER'
+        story.append(logo)
+        story.append(Spacer(1, 0.2*inch))
+    except Exception:
+        story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
+
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        textColor=GOOGLE_BLUE,
+        alignment=TA_CENTER,
+        fontSize=18,
+        spaceAfter=12
+    )
+    story.append(Paragraph(f"Local Visibility Report for {business_name}", title_style))
+    story.append(Spacer(1, 0.1*inch))
+
+    # How-to guide
+    guide_style = ParagraphStyle(
+        'Guide',
+        parent=styles['Normal'],
+        textColor=GOOGLE_RED,
+        fontSize=11,
+        leading=14,
+        spaceAfter=6
+    )
+    story.append(Paragraph("<b>HOW TO ADD THIS TO YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
+    guide_text = """
+    1. Open Google Maps on your phone or computer.<br/>
+    2. Search for your business name.<br/>
+    3. Tap or click on your business.<br/>
+    4. Look for “Edit profile” or “Manage this business” and open it.<br/>
+    5. Copy the New Business Description below and paste it into the description box.<br/>
+    6. To add a post: look for “Add update” or “Create post”, then copy one of the three posts and paste it.<br/>
+    7. Add any suggested categories if you see the option.<br/>
+    8. Take or upload photos based on the photo ideas.<br/>
+    9. When customers leave reviews, use the sample replies as a guide.
+    """
+    story.append(Paragraph(guide_text, styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
+
+    # Summary table
+    summary_data = [
+        ["Field", "Value"],
+        ["Business", business_name],
+        ["Keyword", keyword],
+        ["Location", location_input],
+        ["Visibility Score", f"{st.session_state.visibility_score}%"],
+        ["Found in Top Results", "Yes" if st.session_state.target_found else "No"],
+        ["Position", str(st.session_state.target_position or "Not in top results")],
+    ]
+    summary_table = Table(summary_data, colWidths=[2*inch, 4.5*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    story.append(Paragraph("<b>Report Summary</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
+    story.append(summary_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # NAP
+    story.append(Paragraph("<b>Business Details (NAP)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
+    story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
+
+    # Top results table
+    if st.session_state.df is not None and not st.session_state.df.empty:
+        story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
+        table_data = [list(st.session_state.df.columns)] + st.session_state.df.fillna("").astype(str).values.tolist()
+        results_table = Table(table_data, colWidths=[0.7*inch, 1.8*inch, 0.6*inch, 0.6*inch, 1.5*inch, 1.2*inch, 0.7*inch, 0.7*inch])
+        results_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        story.append(results_table)
+        story.append(Spacer(1, 0.2*inch))
+
+    # Competitors
+    story.append(Paragraph("<b>Top Competitors</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
+    story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
+    story.append(Spacer(1, 0.15*inch))
+
+    # AI Content
+    story.append(Paragraph("<b>Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
+    content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
+    story.append(content_para)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
 
@@ -208,7 +333,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
         st.caption(f"URL: {maps_url}")
     else:
-        st.warning(f"**{business_name}** was not found in the top local results for this keyword. It may still have a Google Business Profile but is not ranking for this search.")
+        st.warning(f"**{business_name}** was not found in the top local results for this keyword.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -236,57 +361,16 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Top Competitors")
     st.text(st.session_state.competitors)
 
-    st.subheader("Owner-Friendly Content (Copy and Paste)")
-    st.info("The sections below are written in simple language so the business owner can copy and paste them into their Google Business Profile.")
+    st.subheader("Owner-Friendly Content")
     st.markdown(st.session_state.sample_content)
 
-    # Owner-friendly report with guide at the top
-    how_to_guide = """HOW TO ADD THIS TO YOUR GOOGLE BUSINESS PROFILE
-================================================
+    # PDF download
+    pdf_buffer = create_pdf_report()
+    st.download_button(
+        label="Download PDF Report",
+        data=pdf_buffer,
+        file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
+        mime="application/pdf"
+    )
 
-This report gives you ready-to-use words you can copy and paste.
-
-Follow these simple steps:
-
-1. Open Google Maps on your phone or computer.
-2. Search for your business name.
-3. Tap or click on your business.
-4. Look for “Edit profile” or “Manage this business” and open it.
-5. Copy the New Business Description from this report and paste it into the description box.
-6. To add a post: look for “Add update” or “Create post”, then copy one of the three posts below and paste it.
-7. Add any suggested categories if you see the option.
-8. Take or upload photos based on the photo ideas.
-9. When customers leave reviews, use the sample replies as a guide.
-
-You can do these steps one at a time. You do not have to finish everything in one sitting.
-
-================================================
-"""
-
-    report = f"""{how_to_guide}
-LOCAL VISIBILITY REPORT FOR {business_name.upper()}
-Date: {datetime.now().strftime('%B %d, %Y')}
-Keyword searched: {keyword}
-Location: {location_input}
-Visibility Score: {st.session_state.visibility_score}%
-Found in top results: {'Yes' if st.session_state.target_found else 'No'}
-Position: {st.session_state.target_position or 'Not in top results'}
-
-BUSINESS DETAILS
-{st.session_state.auto_nap}
-
-TOP 5 LOCAL RESULTS
-{st.session_state.df.to_string(index=False)}
-
-TOP COMPETITORS
-{st.session_state.competitors}
-
-READY-TO-USE CONTENT
-{st.session_state.sample_content}
-
-================================================
-End of report. You can print this or email it to yourself.
-"""
-    st.download_button("Download Owner-Friendly Report", report, file_name=f"{business_name.replace(' ', '_')}_report.txt", mime="text/plain")
-
-st.sidebar.info("The downloaded report now includes a simple step-by-step guide at the top so non-technical owners can follow along.")
+st.sidebar.info("PDF reports include your logo, Google brand colors, and clean tables.")
