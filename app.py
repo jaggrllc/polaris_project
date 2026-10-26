@@ -6,6 +6,7 @@ import folium
 from streamlit_folium import st_folium
 from datetime import datetime
 from collections import Counter
+from urllib.parse import quote
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -95,7 +96,6 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     target_lat = target_lon = None
                     target_address = target_phone = ""
 
-                    # Top 5 Local Results
                     for item in main_local[:5]:
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
@@ -187,6 +187,17 @@ if st.session_state.results_ready and st.session_state.df is not None:
     if st.session_state.target_lat:
         st.success("Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
+
+    # GO TO business button
+    if st.session_state.target_lat and st.session_state.target_lon:
+        name_encoded = quote(business_name)
+        maps_url = (
+            f"https://www.google.com/maps/place/{name_encoded}/"
+            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
+        )
+        st.link_button(f"Go to {business_name}", maps_url, type="primary")
+    else:
+        st.info("Coordinates needed to generate the Go to business link.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
