@@ -58,6 +58,22 @@ def get_current_season():
     else:
         return "Fall"
 
+def clean_ai_content(text):
+    """Clean AI-generated markdown so it looks polished in the PDF."""
+    if not text:
+        return ""
+    # Convert **bold** to real bold
+    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    # Remove ### headings and the following space
+    text = re.sub(r'#+\s*', '', text)
+    # Replace numbered list items with stars (especially under ACTION PLAN)
+    text = re.sub(r'(?m)^(\d+)\.\s+', '★ ', text)
+    # Clean up any remaining stray markdown artifacts
+    text = text.replace('**', '').replace('###', '')
+    # Normalize line breaks
+    text = text.replace('\n', '<br/>')
+    return text
+
 GOOGLE_BLUE = colors.HexColor("#4285F4")
 GOOGLE_RED = colors.HexColor("#EA4335")
 GOOGLE_YELLOW = colors.HexColor("#FBBC05")
@@ -442,7 +458,7 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # ===== Google Maps logo + link moved ABOVE the DIY heading =====
+    # Google Maps logo + link above DIY section
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
@@ -458,9 +474,10 @@ def create_pdf_report():
         story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
         story.append(Spacer(1, 0.15*inch))
 
-    # DIY heading now comes after the maps logo/link
+    # DIY heading + cleaned content
     story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
-    content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
+    cleaned_content = clean_ai_content(st.session_state.sample_content)
+    content_para = Paragraph(cleaned_content, styles['Normal'])
     story.append(content_para)
 
     doc.build(story)
@@ -519,9 +536,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Google Maps logo and link now appear above the DIY heading in the PDF.")
-
-
-
-
-
+st.sidebar.info("DIY content in the PDF is now cleaned: stars instead of numbers, bold instead of **, and ### removed.")
