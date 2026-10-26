@@ -5,6 +5,7 @@ from openai import OpenAI
 import folium
 from streamlit_folium import st_folium
 from datetime import datetime
+from collections import Counter
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -60,16 +61,15 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                 client = serpapi.Client(api_key=serpapi_key)
                 points = []
 
-                # Define points: center + optional offsets for simple grid
                 if lat != 0.0 and lon != 0.0:
                     center_ll = f"@{lat},{lon},{zoom}z"
                     points.append(("Center", center_ll))
                     if do_grid:
-                        offset = 0.02  # ~2 km
+                        offset = 0.02
                         points.append(("North", f"@{lat+offset},{lon},{zoom}z"))
                         points.append(("East", f"@{lat},{lon+offset},{zoom}z"))
                 else:
-                    points.append(("Main", None))  # location string only
+                    points.append(("Main", None))
 
                 all_local = []
                 point_results = []
@@ -90,13 +90,13 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                 if not all_local:
                     st.warning("No local results returned.")
                 else:
-                    # Build table from first/main point
                     main_local = point_results[0][1]
                     rows = []
                     target_lat = target_lon = None
                     target_address = target_phone = ""
 
-                    for item in main_local[:12]:
+                    # Explicitly take top 10
+                    for item in main_local[:10]:
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
                         rows.append({
@@ -126,7 +126,6 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     target_found = any(business_name.lower() in str(r.get("title") or "").lower() for r in main_local)
                     target_position = next((r.get("position") for r in main_local if business_name.lower() in str(r.get("title") or "").lower()), None)
 
-                    # Visibility score across points
                     top3_count = 0
                     for _, locs in point_results:
                         for item in locs[:3]:
@@ -135,17 +134,14 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                                 break
                     visibility_score = round((top3_count / len(points)) * 100) if points else 0
 
-                    # Competitor frequency
-                    from collections import Counter
                     titles = [item.get("title") for item in all_local if item.get("title")]
                     competitors = Counter(titles).most_common(5)
                     comp_text = "\n".join([f"{name}: {count} appearances" for name, count in competitors])
 
-                    # AI plan + sample content
                     summary = df.to_string(index=False)
                     prompt = f"""Analyze local results for "{keyword}" near {location_input or f'{lat},{lon}'}.
 Target: {business_name} (found: {target_found}, position: {target_position}, visibility score: {visibility_score}%).
-Top results:\n{summary}
+Top 10 results:\n{summary}
 Competitors:\n{comp_text}
 
 1. Write a practical 5-8 bullet action plan.
@@ -184,14 +180,14 @@ Keep everything concise and realistic. Do not invent data."""
 
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score (approx. % in top 3)", f"{st.session_state.visibility_score}%")
-    st.subheader("Local Results")
+
+    st.subheader("Top 10 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_lat:
         st.success("Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
-    # Map
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
         center = [st.session_state.target_lat or map_df["Latitude"].mean(),
@@ -226,7 +222,6 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Sample Content Ideas")
     st.markdown(st.session_state.sample_content)
 
-    # Downloadable report
     report = f"""AI Local Map Auditor Report
 Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 Business: {business_name}
@@ -238,6 +233,9 @@ Position: {st.session_state.target_position or 'N/A'}
 
 NAP:
 {st.session_state.auto_nap}
+
+Top 10 Local Results:
+{st.session_state.df.to_string(index=False)}
 
 Competitors:
 {st.session_state.competitors}
