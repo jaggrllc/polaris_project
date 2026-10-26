@@ -11,7 +11,7 @@ import re
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -37,6 +37,14 @@ def normalize(name):
     name = re.sub(r'\s+', ' ', name).strip()
     name = name.replace("landscaping", "landscape")
     return name
+
+def truncate(text, length=30):
+    if not text or not isinstance(text, str):
+        return ""
+    text = text.strip()
+    if len(text) <= length:
+        return text
+    return text[:length].rstrip() + "..."
 
 # Google brand colors
 GOOGLE_BLUE = colors.HexColor("#4285F4")
@@ -203,13 +211,27 @@ Keep it friendly and easy to follow. Do not invent facts about the business."""
             except Exception as e:
                 st.error(f"Error: {e}")
 
+def format_address(addr):
+    """Stack street over city/state/zip when possible."""
+    if not addr or not isinstance(addr, str):
+        return ""
+    addr = addr.strip()
+    # Simple split on comma (most common format)
+    parts = [p.strip() for p in addr.split(",")]
+    if len(parts) >= 2:
+        street = truncate(parts[0], 28)
+        rest = ", ".join(parts[1:])
+        rest = truncate(rest, 28)
+        return f"{street}<br/>{rest}"
+    return truncate(addr, 30)
+
 def create_pdf_report():
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
     story = []
 
-    # Logo (1 inch x 1 inch, centered)
+    # Logo
     try:
         logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
         logo.hAlign = 'CENTER'
@@ -218,7 +240,6 @@ def create_pdf_report():
     except Exception:
         story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
 
-    # Title
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -230,7 +251,6 @@ def create_pdf_report():
     story.append(Paragraph(f"Local Visibility Report for {business_name}", title_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # How-to guide
     guide_style = ParagraphStyle(
         'Guide',
         parent=styles['Normal'],
@@ -284,19 +304,41 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Top results table
+    # Top results table with truncated titles and stacked addresses
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
-        table_data = [list(st.session_state.df.columns)] + st.session_state.df.fillna("").astype(str).values.tolist()
-        results_table = Table(table_data, colWidths=[0.7*inch, 1.8*inch, 0.6*inch, 0.6*inch, 1.5*inch, 1.2*inch, 0.7*inch, 0.7*inch])
+
+        # Build table with Paragraphs for multi-line support
+        header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
+        table_data = [header]
+
+        cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
+
+        for _, row in st.session_state.df.iterrows():
+            title_p = Paragraph(truncate(str(row.get("Title", "")), 30), cell_style)
+            address_p = Paragraph(format_address(str(row.get("Address", ""))), cell_style)
+            phone_p = Paragraph(truncate(str(row.get("Phone", "")), 18), cell_style)
+            table_data.append([
+                str(row.get("Position", "")),
+                title_p,
+                str(row.get("Rating", "")),
+                str(row.get("Reviews", "")),
+                address_p,
+                phone_p,
+            ])
+
+        results_table = Table(table_data, colWidths=[0.5*inch, 1.6*inch, 0.55*inch, 0.6*inch, 1.8*inch, 1.1*inch])
         results_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
             ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
         ]))
         story.append(results_table)
         story.append(Spacer(1, 0.2*inch))
@@ -364,7 +406,6 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Owner-Friendly Content")
     st.markdown(st.session_state.sample_content)
 
-    # PDF download
     pdf_buffer = create_pdf_report()
     st.download_button(
         label="Download PDF Report",
@@ -373,4 +414,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF reports include your logo, Google brand colors, and clean tables.")
+st.sidebar.info("PDF tables now trim long titles and stack street address over city/state/zip.")
