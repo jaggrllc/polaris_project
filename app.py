@@ -48,8 +48,6 @@ if "results_ready" not in st.session_state:
     st.session_state.visibility_score = None
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
-    st.session_state.keywords = ""
-    st.session_state.website_tips = ""
 
 col1, col2 = st.columns(2)
 with col1:
@@ -196,9 +194,15 @@ if st.session_state.results_ready and st.session_state.df is not None:
     if st.session_state.target_found and st.session_state.target_lat:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
-        name_encoded = quote(business_name)
-        maps_url = f"https://www.google.com/maps/place/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
+
+        # Google Maps URL with Business Name included
+        name_encoded = quote(business_name.replace(" ", "+"))
+        maps_url = (
+            f"https://www.google.com/maps/place/{name_encoded}/"
+            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
+        )
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
+        st.caption(f"URL: {maps_url}")
     else:
         st.warning(f"**{business_name}** was not found in the top local results for this keyword. It may still have a Google Business Profile but is not ranking for this search.")
 
@@ -254,4 +258,4 @@ AI Insights & Content:
 """
     st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("Expanded original tools for local visibility, content, and recommendations.")
+st.sidebar.info("The GO to Business link now includes the business name in the Google Maps URL.")
