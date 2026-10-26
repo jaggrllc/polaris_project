@@ -442,7 +442,8 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    story.append(Paragraph("<b>Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
+    # Updated heading
+    story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
     story.append(content_para)
 
@@ -466,7 +467,6 @@ def create_pdf_report():
 
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
-    # Changed on-page heading
     st.subheader("Top Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
@@ -517,4 +517,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("On-page heading updated to Top Local Results.")
+st.sidebar.info("PDF heading updated to DIY (Do-It-Yourself), Ready-to-Use Content.")
