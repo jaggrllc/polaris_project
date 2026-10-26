@@ -62,12 +62,9 @@ def clean_ai_content(text):
     """Clean AI content while preserving icons under post headings."""
     if not text:
         return ""
-    # Convert **bold** to real bold (preserve any icons inside)
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # Remove ### and H-style prefixes
     text = re.sub(r'#+\s*', '', text)
     text = re.sub(r'(?i)^h[1-6]\.?\s*', '', text, flags=re.MULTILINE)
-    # Force clean main section headings
     replacements = {
         r'(?i)1\.?\s*ACTION PLAN': '1. ACTION PLAN',
         r'(?i)2\.?\s*NEW BUSINESS DESCRIPTION': '2. NEW BUSINESS DESCRIPTION',
@@ -79,24 +76,19 @@ def clean_ai_content(text):
     }
     for pattern, replacement in replacements.items():
         text = re.sub(pattern, replacement, text)
-    # Process lines: keep post headings and icons, convert only plain numbered steps to stars
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
         stripped = line.strip()
-        # Preserve main section titles
         if re.match(r'^[1-7]\.\s+(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
             cleaned_lines.append(stripped)
-        # Preserve Post 1 / Post 2 / Post 3 headings and anything under them (including icons)
         elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
             cleaned_lines.append(line)
-        # Convert ordinary numbered steps to stars (but leave post content alone)
         elif re.match(r'^\d+\.\s+', stripped) and not any(x in stripped.lower() for x in ['post ', 'fall', 'clean-up', 'winter', 'spring', 'summer']):
             cleaned_lines.append('★ ' + re.sub(r'^\d+\.\s+', '', stripped))
         else:
             cleaned_lines.append(line)
     text = '\n'.join(cleaned_lines)
-    # Final light cleanup (do not strip Unicode icons)
     text = text.replace('**', '').replace('###', '')
     text = text.replace('\n', '<br/>')
     return text
@@ -486,7 +478,6 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Google Maps logo + link
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
@@ -502,7 +493,6 @@ def create_pdf_report():
         story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
         story.append(Spacer(1, 0.15*inch))
 
-    # DIY heading + cleaned content (icons under posts are preserved)
     story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     cleaned_content = clean_ai_content(st.session_state.sample_content)
     content_para = Paragraph(cleaned_content, styles['Normal'])
@@ -557,10 +547,13 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.markdown(st.session_state.sample_content)
 
     pdf_buffer = create_pdf_report()
+    # Renamed button
     st.download_button(
-        label="Download PDF Report",
+        label="Download Google Maps Profile Report Card",
         data=pdf_buffer,
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-st.sidebar.info("Icons under Post 1 / Post 2 / Post 3 headings are now preserved and appear in the PDF.")
+
+st.sidebar.info("Download button renamed to Download Google Maps Profile Report Card.")
+Update the file on GitHub and redeploy.
