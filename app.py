@@ -229,46 +229,66 @@ def create_pdf_report():
     styles = getSampleStyleSheet()
     story = []
 
-    # Logo
+    # Jaguar Group logo
     try:
         logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
         logo.hAlign = 'CENTER'
         story.append(logo)
-        story.append(Spacer(1, 0.2*inch))
+        story.append(Spacer(1, 0.15*inch))
     except Exception:
         story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
 
-    title_style = ParagraphStyle(
-        'CustomTitle',
+    # Two-line title
+    title_style1 = ParagraphStyle(
+        'TitleLine1',
+        parent=styles['Normal'],
+        textColor=GOOGLE_BLUE,
+        alignment=TA_CENTER,
+        fontSize=14,
+        spaceAfter=2
+    )
+    title_style2 = ParagraphStyle(
+        'TitleLine2',
         parent=styles['Heading1'],
         textColor=GOOGLE_BLUE,
         alignment=TA_CENTER,
-        fontSize=18,
-        spaceAfter=12
+        fontSize=16,
+        spaceAfter=10
     )
-    story.append(Paragraph(f"Local Visibility Report for {business_name}", title_style))
+    story.append(Paragraph("Local Visibility Report for", title_style1))
+    story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
     story.append(Spacer(1, 0.1*inch))
 
-    # Clickable Google Maps link (closest practical substitute for an iframe)
+    # Google Maps logo + clickable link
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = (
             f"https://www.google.com/maps/search/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
+
+        # Google Maps logo above the link
+        try:
+            maps_logo = Image("google-maps-logo.png", width=1.2*inch, height=0.4*inch)
+            maps_logo.hAlign = 'CENTER'
+            story.append(maps_logo)
+            story.append(Spacer(1, 0.05*inch))
+        except Exception:
+            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE)))
+
         link_style = ParagraphStyle(
             'MapLink',
             parent=styles['Normal'],
             textColor=GOOGLE_BLUE,
-            fontSize=12,
+            fontSize=11,
             alignment=TA_CENTER,
-            spaceAfter=10
+            spaceAfter=8
         )
         story.append(Paragraph(
             f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>',
             link_style
         ))
-        story.append(Spacer(1, 0.1*inch))
+        story.append(Spacer(1, 0.15*inch))
 
     guide_style = ParagraphStyle(
         'Guide',
@@ -431,4 +451,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF includes a clickable Google Maps link (true iframes are not possible inside PDFs).")
+st.sidebar.info("PDF title is now two lines and the Google Maps logo sits above the map link.")
