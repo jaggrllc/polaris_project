@@ -20,13 +20,18 @@ def get_secret(name: str, label: str):
     except Exception:
         return st.sidebar.text_input(label, type="password")
 
-def clean_name(name):
+def normalize(name):
+    """Better normalization for business name matching."""
     if not name:
         return ""
     name = name.lower()
-    name = re.sub(r'\b(llc|inc|ltd|co|company)\b', '', name)
-    name = re.sub(r'[^a-z0-9\s]', '', name)
-    return " ".join(name.split())
+    name = name.replace("&", "and").replace("+", "and")
+    name = re.sub(r'\b(llc|inc|ltd|co|company|the)\b', '', name)
+    name = re.sub(r'[^a-z0-9\s]', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Treat "landscape" and "landscaping" as similar
+    name = name.replace("landscaping", "landscape")
+    return name
 
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
@@ -48,14 +53,12 @@ if "results_ready" not in st.session_state:
 
 col1, col2 = st.columns(2)
 with col1:
-    business_name = st.text_input("Target Business Name", placeholder="e.g. Dan The Landscapin Man LLC")
-    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaping")
+    business_name = st.text_input("Target Business Name", placeholder="e.g. C&L Landscape")
+    keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaper or landscaping")
     business_address = st.text_input("Business Address (optional override)")
     business_phone = st.text_input("Business Phone (optional override)")
 with col2:
     location_input = st.text_input("Search Location (city)", placeholder="e.g. Jacksonville, FL")
-
-do_grid = st.checkbox("Run simple 3-point visibility check (uses extra SerpAPI credits)", value=False)
 
 if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_key)):
     if not business_name or not keyword or not location_input:
@@ -64,34 +67,27 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
         with st.spinner("Running audit..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
-                points = [("Main", None)]
 
-                all_local = []
-                point_results = []
+                params = {
+                    "engine": "google",
+                    "q": keyword,
+                    "location": location_input,
+                    "hl": "en",
+                    "gl": "us",
+                }
+                res = client.search(params)
+                local = res.get("local_results", [])
+                if isinstance(local, dict) and "places" in local:
+                    local = local["places"]
+                main_local = local or []
 
-                for label, ll in points:
-                    params = {
-                        "engine": "google",
-                        "q": keyword,
-                        "location": location_input,
-                        "hl": "en",
-                        "gl": "us",
-                    }
-                    res = client.search(params)
-                    local = res.get("local_results", [])
-                    if isinstance(local, dict) and "places" in local:
-                        local = local["places"]
-                    all_local.extend(local or [])
-                    point_results.append((label, local or []))
-
-                if not all_local:
-                    st.warning("No local results returned.")
+                if not main_local:
+                    st.warning("No local results returned. Try a different keyword (e.g. 'landscaper' or 'landscaping company').")
                 else:
-                    main_local = point_results[0][1]
                     rows = []
                     target_lat = target_lon = None
                     target_address = target_phone = ""
-                    cleaned_target = clean_name(business_name)
+                    norm_target = normalize(business_name)
 
                     for item in main_local[:15]:
                         gps = item.get("gps_coordinates", {}) or {}
@@ -107,7 +103,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
                         })
-                        if cleaned_target and cleaned_target in clean_name(title):
+                        if norm_target and norm_target in normalize(title):
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
@@ -119,17 +115,16 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         target_phone = business_phone.strip()
 
                     df = pd.DataFrame(rows[:5])
-                    target_found = any(cleaned_target in clean_name(str(r.get("title") or "")) for r in main_local)
+                    target_found = any(norm_target in normalize(str(r.get("title") or "")) for r in main_local)
                     target_position = next(
                         (r.get("position") for r in main_local
-                         if cleaned_target in clean_name(str(r.get("title") or ""))),
+                         if norm_target in normalize(str(r.get("title") or ""))),
                         None
                     )
 
-                    top3_count = 1 if target_found else 0
                     visibility_score = 100 if target_found else 0
 
-                    titles = [item.get("title") for item in all_local if item.get("title")]
+                    titles = [item.get("title") for item in main_local if item.get("title")]
                     competitors = Counter(titles).most_common(5)
                     comp_text = "\n".join([f"{name}: {count} appearances" for name, count in competitors])
 
@@ -179,8 +174,8 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Top 5 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
-    if st.session_state.target_lat and st.session_state.target_lon:
-        st.success("Auto-captured NAP:")
+    if st.session_state.target_found and st.session_state.target_lat:
+        st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
         name_encoded = quote(business_name)
@@ -190,7 +185,11 @@ if st.session_state.results_ready and st.session_state.df is not None:
         )
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
     else:
-        st.info("Business not found in results.")
+        st.warning(
+            f"**{business_name}** was not found in the top local results for this keyword. "
+            "It may still have a Google Business Profile, but it is not ranking for the search you entered. "
+            "Try keywords like 'landscaper', 'landscaping', or 'landscape company'."
+        )
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -200,7 +199,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
                        tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google Maps")
 
         for _, row in map_df.iterrows():
-            if clean_name(business_name) not in clean_name(str(row["Title"])):
+            if normalize(business_name) not in normalize(str(row["Title"])):
                 folium.Marker([row["Latitude"], row["Longitude"]], popup=row["Title"],
                               icon=folium.Icon(color="blue")).add_to(m)
 
@@ -249,4 +248,7 @@ AI Insights:
 """
     st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("All features are original implementations. Coordinates are captured automatically from results when available.")
+st.sidebar.info(
+    "Tip: For C&L Landscape try keywords such as 'landscaper', 'landscaping', or 'landscape company' "
+    "in Jacksonville, FL. Name matching now handles & and Landscape/Landscaping variations."
+)
