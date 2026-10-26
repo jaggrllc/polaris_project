@@ -191,7 +191,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
         st.success("Auto-captured NAP and Coordinates:")
         st.code(f"{st.session_state.auto_nap}\nLatitude: {st.session_state.target_lat}\nLongitude: {st.session_state.target_lon}")
 
-    # Automated GO TO button
+    # Automated Go To Business link button
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote(business_name)
         maps_url = (
