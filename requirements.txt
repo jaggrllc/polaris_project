@@ -4,3 +4,4 @@ serpapi
 openai
 streamlit-folium
 folium
+reportlab
