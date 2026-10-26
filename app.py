@@ -563,4 +563,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-st.sidebar.info("Icons under Post 1 / Post 2 / Post 3 headings are now preserved and appear in the PDF.")) that appear on the Streamlit page should now also appear in the downloaded PDF Report Card.
+st.sidebar.info("Icons under Post 1 / Post 2 / Post 3 headings are now preserved and appear in the PDF.")
