@@ -195,10 +195,10 @@ if st.session_state.results_ready and st.session_state.df is not None:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
-        # Google Maps URL with Business Name in the path (like the Dan The Landscapin Man example)
+        # Google Maps URL using /search/ so it redirects to the final destination page
         name_encoded = quote_plus(business_name)
         maps_url = (
-            f"https://www.google.com/maps/place/{name_encoded}/"
+            f"https://www.google.com/maps/search/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
@@ -258,4 +258,6 @@ AI Insights & Content:
 """
     st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("The GO to Business link now includes the business name in the Google Maps URL path.")
+st.sidebar.info("The GO to Business link now uses /maps/search/ so it redirects to the final destination page.")
+
+Update the file on GitHub and redeploy. The link should now redirect correctly.
