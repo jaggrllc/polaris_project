@@ -59,7 +59,6 @@ def get_current_season():
         return "Fall"
 
 def clean_ai_content(text):
-    """Clean AI content while preserving icons under post headings."""
     if not text:
         return ""
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
@@ -116,10 +115,12 @@ if "results_ready" not in st.session_state:
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
     st.session_state.report_card = {}
+    st.session_state.auto_answers = ""
+    st.session_state.auto_scores = {}
 
 # ---------- REPORT CARD QUESTIONS ----------
 st.subheader("Google Maps Profile Report Card")
-st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
+st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10. Answers auto-fill after Run Audit.")
 
 questions = [
     "1. Is the Business Details (NAP) correctly listed?",
@@ -134,11 +135,21 @@ questions = [
     "10. Are there any duplicate business listings for the same business?",
 ]
 
+# Auto answers text box (fills after Run Audit)
+auto_answers_placeholder = st.empty()
+if st.session_state.get("auto_answers"):
+    auto_answers_placeholder.text_area("Automated Answers (filled after Run Audit)", value=st.session_state.auto_answers, height=220, disabled=True)
+else:
+    auto_answers_placeholder.text_area("Automated Answers (will appear here after Run Audit)", value="", height=220, disabled=True)
+
 report_card = {}
 cols = st.columns(2)
 for i, q in enumerate(questions):
+    default_idx = 1  # FAIL by default
+    if st.session_state.get("auto_scores") and q in st.session_state.auto_scores:
+        default_idx = 0 if st.session_state.auto_scores[q] == "PASS" else 1
     with cols[i % 2]:
-        report_card[q] = st.radio(q, ["PASS", "FAIL"], index=1, horizontal=True, key=f"q{i}")
+        report_card[q] = st.radio(q, ["PASS", "FAIL"], index=default_idx, horizontal=True, key=f"q{i}")
 
 st.session_state.report_card = report_card
 
@@ -202,12 +213,15 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     rows = []
                     target_lat = target_lon = None
                     target_address = target_phone = ""
+                    target_item = None
                     norm_target = normalize(business_name)
+                    titles = []
 
                     for item in main_local[:15]:
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
                         title = item.get("title") or ""
+                        titles.append(title)
                         rows.append({
                             "Position": item.get("position"),
                             "Title": title,
@@ -223,6 +237,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
                             target_phone = phone
+                            target_item = item
 
                     if business_address.strip():
                         target_address = business_address.strip()
@@ -238,9 +253,73 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     )
                     visibility_score = 100 if target_found else 0
 
-                    titles = [item.get("title") for item in main_local if item.get("title")]
                     competitors = Counter(titles).most_common(5)
                     comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
+
+                    # ========== AUTOMATED SCORING ==========
+                    auto_scores = {}
+                    answers_list = []
+
+                    if target_item:
+                        # 1. NAP correctly listed
+                        has_nap = bool(target_item.get("title") and target_item.get("address") and (target_item.get("phone") or target_item.get("phone_number")))
+                        auto_scores[questions[0]] = "PASS" if has_nap else "FAIL"
+                        answers_list.append(f"1. NAP listed: {'PASS' if has_nap else 'FAIL'} (Name + Address + Phone present)")
+
+                        # 2. Primary category matches main service
+                        cat = (target_item.get("type") or "").lower()
+                        kw = keyword.lower()
+                        cat_match = any(w in cat for w in kw.split()) or kw in cat
+                        auto_scores[questions[1]] = "PASS" if cat_match else "FAIL"
+                        answers_list.append(f"2. Category match: {'PASS' if cat_match else 'FAIL'} (type='{target_item.get('type', 'N/A')}')")
+
+                        # 3. Opening hours listed
+                        has_hours = bool(target_item.get("hours") or target_item.get("operating_hours"))
+                        auto_scores[questions[2]] = "PASS" if has_hours else "FAIL"
+                        answers_list.append(f"3. Opening hours: {'PASS' if has_hours else 'FAIL'}")
+
+                        # 4. VERIFIED NAP and pin aligned
+                        has_pin = bool(target_lat and target_lon)
+                        auto_scores[questions[3]] = "PASS" if has_pin and has_nap else "FAIL"
+                        answers_list.append(f"4. Pin aligned: {'PASS' if has_pin and has_nap else 'FAIL'} (GPS coordinates present)")
+
+                        # 5. Services listed
+                        has_services = bool(target_item.get("service_options") or target_item.get("extensions"))
+                        auto_scores[questions[4]] = "PASS" if has_services else "FAIL"
+                        answers_list.append(f"5. Services listed: {'PASS' if has_services else 'FAIL'} (limited data from local results)")
+
+                        # 6. Owner responses (estimated – full check needs reviews engine)
+                        auto_scores[questions[5]] = "FAIL"  # conservative default
+                        answers_list.append("6. Owner responses: FAIL (requires deeper review scrape – estimated)")
+
+                        # 7. Active website
+                        has_website = bool(target_item.get("links", {}).get("website") or target_item.get("website"))
+                        auto_scores[questions[6]] = "PASS" if has_website else "FAIL"
+                        answers_list.append(f"7. Website listed: {'PASS' if has_website else 'FAIL'}")
+
+                        # 8. At least 10 positive reviews
+                        reviews = target_item.get("reviews") or 0
+                        rating = target_item.get("rating") or 0
+                        has_reviews = reviews >= 10 and rating >= 4.0
+                        auto_scores[questions[7]] = "PASS" if has_reviews else "FAIL"
+                        answers_list.append(f"8. Reviews (≥10 & ≥4.0): {'PASS' if has_reviews else 'FAIL'} ({reviews} reviews, {rating} rating)")
+
+                        # 9. NAP matches website (estimated)
+                        auto_scores[questions[8]] = "FAIL"
+                        answers_list.append("9. NAP matches website: FAIL (requires website crawl – estimated)")
+
+                        # 10. Duplicate listings
+                        similar = sum(1 for t in titles if normalize(t) == norm_target)
+                        has_duplicates = similar > 1
+                        auto_scores[questions[9]] = "FAIL" if has_duplicates else "PASS"
+                        answers_list.append(f"10. Duplicates: {'FAIL (duplicates found)' if has_duplicates else 'PASS (no obvious duplicates)'}")
+                    else:
+                        for q in questions:
+                            auto_scores[q] = "FAIL"
+                        answers_list = [f"{i+1}. {q.split('. ', 1)[1] if '. ' in q else q}: FAIL (business not found in results)" for i, q in enumerate(questions)]
+
+                    st.session_state.auto_scores = auto_scores
+                    st.session_state.auto_answers = "\n".join(answers_list)
 
                     current_season = get_current_season()
                     summary = df.to_string(index=False)
@@ -309,6 +388,8 @@ Keep it friendly and easy to follow. Do not invent facts about the business."""
                         "competitors": comp_text,
                         "sample_content": full_ai,
                     })
+
+                    st.rerun()
 
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -547,7 +628,6 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.markdown(st.session_state.sample_content)
 
     pdf_buffer = create_pdf_report()
-    # Renamed button
     st.download_button(
         label="Download Google Maps Profile Report Card",
         data=pdf_buffer,
@@ -555,4 +635,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Download button renamed to Download Google Maps Profile Report Card.")
+st.sidebar.info("Report Card questions now auto-score after Run Audit using SerpAPI data. Answers appear in the text box above the questions.")
