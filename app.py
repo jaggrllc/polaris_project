@@ -406,7 +406,6 @@ def create_pdf_report():
     story.append(Spacer(1, 0.15*inch))
 
     if st.session_state.df is not None and not st.session_state.df.empty:
-        # Changed heading
         story.append(Paragraph("<b>Top Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
@@ -467,7 +466,8 @@ def create_pdf_report():
 
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
-    st.subheader("Top 5 Local Results")
+    # Changed on-page heading
+    st.subheader("Top Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_found and st.session_state.target_lat:
@@ -517,4 +517,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF heading updated to Top Local Results.")
+st.sidebar.info("On-page heading updated to Top Local Results.")
