@@ -442,24 +442,26 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Updated heading
-    story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
-    content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
-    story.append(content_para)
-
+    # ===== Google Maps logo + link moved ABOVE the DIY heading =====
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         try:
             maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
             maps_logo.hAlign = 'CENTER'
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Spacer(1, 0.15*inch))
             story.append(maps_logo)
             story.append(Spacer(1, 0.05*inch))
         except Exception:
-            pass
-        link_style = ParagraphStyle('MapLink', parent=styles['Normal'], textColor=GOOGLE_BLUE, fontSize=11, alignment=TA_CENTER)
+            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE)))
+        link_style = ParagraphStyle('MapLink', parent=styles['Normal'], textColor=GOOGLE_BLUE, fontSize=11, alignment=TA_CENTER, spaceAfter=8)
         story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
+        story.append(Spacer(1, 0.15*inch))
+
+    # DIY heading now comes after the maps logo/link
+    story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
+    content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
+    story.append(content_para)
 
     doc.build(story)
     buffer.seek(0)
@@ -517,4 +519,9 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("PDF heading updated to DIY (Do-It-Yourself), Ready-to-Use Content.")
+st.sidebar.info("Google Maps logo and link now appear above the DIY heading in the PDF.")
+
+
+
+
+
