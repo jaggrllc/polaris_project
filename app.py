@@ -290,15 +290,20 @@ def format_address(addr):
     return truncate(addr, 30)
 
 def create_circular_progress(score, bar_color):
+    """Circular progress bar with score number twice as large."""
     size = 500
     center = size / 2
     radius = 200
     stroke = 45
     d = Drawing(size, size)
+    # Thick outer circle
     d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
+    # Inner white circle
     d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    d.add(String(center, center + 25, f"{score}", fontSize=70, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(center, center - 30, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
+    # Score number — now twice the previous size (140)
+    d.add(String(center, center + 15, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    # "out of 100" text below
+    d.add(String(center, center - 55, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
 
 def create_pdf_report():
@@ -325,7 +330,6 @@ def create_pdf_report():
     story.append(Paragraph(f"This report was prepared by Jaguar Group LLC on {prepared_date}.", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Circular Progress Bar
     story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
     story.append(Spacer(1, 0.1*inch))
 
@@ -361,7 +365,6 @@ def create_pdf_report():
     story.append(rc_table)
     story.append(Spacer(1, 0.25*inch))
 
-    # HOW TO OPTIMIZE
     guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
@@ -379,7 +382,6 @@ def create_pdf_report():
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
-    # Updated headings
     summary_data = [
         ["Field", "Value"],
         ["Business", business_name],
@@ -404,7 +406,7 @@ def create_pdf_report():
     story.append(summary_table)
     story.append(Spacer(1, 0.2*inch))
 
-    story.append(Paragraph("<b>Business Details (Name, Address, Phone Number)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
+    story.append(Paragraph("<b>Business Details (NAP: Name, Address, Phone Number)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
@@ -519,4 +521,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Headings updated: Report Card Summary and Business Details (Name, Address, Phone Number).")
+st.sidebar.info("Score number inside the Circular Progress Bar is now twice as large.")
