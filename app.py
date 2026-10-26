@@ -22,6 +22,7 @@ def get_secret(name: str, label: str):
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
 
+# Initialize session state for auto-populated coordinates
 if "results_ready" not in st.session_state:
     st.session_state.results_ready = False
     st.session_state.df = None
@@ -36,10 +37,12 @@ if "results_ready" not in st.session_state:
     st.session_state.visibility_score = None
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
+    st.session_state.biz_lat_input = 0.0
+    st.session_state.biz_lon_input = 0.0
 
 col1, col2 = st.columns(2)
 with col1:
-    business_name = st.text_input("Target Business Name", placeholder="e.g. Joe's Pizza")
+    business_name = st.text_input("Target Business Name", placeholder="e.g. Dan The Landscapin Man LLC")
     keyword = st.text_input("Keyword / Search Phrase", placeholder="e.g. landscaping")
     business_address = st.text_input("Business Address (optional override)")
     business_phone = st.text_input("Business Phone (optional override)")
@@ -47,8 +50,19 @@ with col2:
     location_input = st.text_input("Search Location (city)", placeholder="e.g. Jacksonville, FL")
     lat = st.number_input("Search Center Latitude (optional)", value=0.0, format="%.6f")
     lon = st.number_input("Search Center Longitude (optional)", value=0.0, format="%.6f")
-    biz_lat = st.number_input("Business Latitude (optional override)", value=0.0, format="%.6f", key="biz_lat_input")
-    biz_lon = st.number_input("Business Longitude (optional override)", value=0.0, format="%.6f", key="biz_lon_input")
+    # Auto-populated fields (values come from session_state after audit)
+    biz_lat = st.number_input(
+        "Business Latitude (auto-filled when found)",
+        value=st.session_state.biz_lat_input,
+        format="%.6f",
+        key="biz_lat_input"
+    )
+    biz_lon = st.number_input(
+        "Business Longitude (auto-filled when found)",
+        value=st.session_state.biz_lon_input,
+        format="%.6f",
+        key="biz_lon_input"
+    )
 
 do_grid = st.checkbox("Run simple 3-point visibility check (uses extra SerpAPI credits)", value=False)
 zoom = st.slider("Map Zoom (for ll)", 10, 18, 14)
@@ -109,21 +123,25 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
                         })
-                        # Auto-capture coordinates and NAP on name match
                         if business_name.lower() in str(item.get("title") or "").lower():
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
                             target_address = item.get("address") or ""
                             target_phone = phone
 
-                    # Overrides only if user filled them
-                    if st.session_state.get("biz_lat_input", 0) != 0 and st.session_state.get("biz_lon_input", 0) != 0:
+                    # Prefer user override only if they changed it from 0
+                    if st.session_state.biz_lat_input != 0.0 and st.session_state.biz_lon_input != 0.0:
                         target_lat = st.session_state.biz_lat_input
                         target_lon = st.session_state.biz_lon_input
                     if business_address.strip():
                         target_address = business_address.strip()
                     if business_phone.strip():
                         target_phone = business_phone.strip()
+
+                    # Auto-populate the input fields for next run / display
+                    if target_lat and target_lon:
+                        st.session_state.biz_lat_input = float(target_lat)
+                        st.session_state.biz_lon_input = float(target_lon)
 
                     df = pd.DataFrame(rows)
                     target_found = any(business_name.lower() in str(r.get("title") or "").lower() for r in main_local)
@@ -188,10 +206,14 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_lat and st.session_state.target_lon:
-        st.success("Auto-captured NAP and Coordinates:")
-        st.code(f"{st.session_state.auto_nap}\nLatitude: {st.session_state.target_lat}\nLongitude: {st.session_state.target_lon}")
+        st.success("Auto-populated Coordinates & NAP:")
+        st.code(
+            f"{st.session_state.auto_nap}\n"
+            f"Latitude: {st.session_state.target_lat}\n"
+            f"Longitude: {st.session_state.target_lon}"
+        )
 
-    # Automated Go To Business link button
+    # GO TO button with auto-populated coordinates in the URL
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote(business_name)
         maps_url = (
@@ -199,8 +221,9 @@ if st.session_state.results_ready and st.session_state.df is not None:
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
+        st.caption(f"URL uses auto-populated coordinates: {st.session_state.target_lat}, {st.session_state.target_lon}")
     else:
-        st.info("Business not found in results — no coordinates available for the GO link. Try a more precise search or enter override coordinates.")
+        st.info("Business not found in results — coordinates not available yet.")
 
     map_df = st.session_state.df.dropna(subset=["Latitude", "Longitude"])
     if not map_df.empty or st.session_state.target_lat:
@@ -259,4 +282,4 @@ AI Insights:
 """
     st.download_button("Download Text Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("Coordinates for the GO link are captured automatically when the business appears in results.")
+st.sidebar.info("Business Latitude and Longitude are auto-populated from results and used in the GO to Business URL.")
