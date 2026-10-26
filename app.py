@@ -201,7 +201,7 @@ if st.session_state.results_ready and st.session_state.df is not None:
             f"https://www.google.com/maps/search/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
-        st.link_button(f"GO to {business_name}", maps_url, type="primary")
+        st.link_button(f"Go to {business_name}", maps_url, type="primary")
         st.caption(f"URL: {maps_url}")
     else:
         st.warning(f"**{business_name}** was not found in the top local results for this keyword. It may still have a Google Business Profile but is not ranking for this search.")
@@ -258,4 +258,4 @@ AI Insights & Content:
 """
     st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("The GO to Business link now uses /maps/search/ so it redirects to the final destination page.")
+st.sidebar.info("The Go to Business link now uses /maps/search/ so it redirects to the final destination page.")
