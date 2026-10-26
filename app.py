@@ -320,13 +320,12 @@ def create_pdf_report():
     story.append(Paragraph("Local Visibility Report for", title_style1))
     story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
 
-    # Updated preparation line
     date_style = ParagraphStyle('PrepDate', parent=styles['Normal'], textColor=colors.black, alignment=TA_CENTER, fontSize=11, fontName='Helvetica-Bold', spaceAfter=8)
     prepared_date = datetime.now().strftime("%B %d, %Y")
     story.append(Paragraph(f"This report was prepared by Jaguar Group LLC on {prepared_date}.", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Circular Progress Bar (centered)
+    # Circular Progress Bar
     story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
     story.append(Spacer(1, 0.1*inch))
 
@@ -341,12 +340,10 @@ def create_pdf_report():
     story.append(progress_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # Bold statement
     stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, fontName='Helvetica-Bold', spaceAfter=8)
     story.append(Paragraph(statement, stmt_style))
     story.append(Spacer(1, 0.1*inch))
 
-    # Report Card table
     rc_data = [["Google Maps Report Card", "Test Results"]]
     for q, result in st.session_state.report_card.items():
         rc_data.append([Paragraph(q, styles['Normal']), result])
@@ -382,7 +379,7 @@ def create_pdf_report():
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
-    # Summary table
+    # Updated headings
     summary_data = [
         ["Field", "Value"],
         ["Business", business_name],
@@ -403,11 +400,11 @@ def create_pdf_report():
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
-    story.append(Paragraph("<b>Report Summary</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
+    story.append(Paragraph("<b>Report Card Summary</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
     story.append(summary_table)
     story.append(Spacer(1, 0.2*inch))
 
-    story.append(Paragraph("<b>Business Details (NAP)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
+    story.append(Paragraph("<b>Business Details (Name, Address, Phone Number)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
@@ -522,4 +519,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Preparation line updated to include Jaguar Group LLC.")
+st.sidebar.info("Headings updated: Report Card Summary and Business Details (Name, Address, Phone Number).")
