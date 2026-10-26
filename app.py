@@ -12,7 +12,7 @@ import re
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Local visibility check, competitor insight, and AI content tools. Original implementation.")
+st.caption("Local visibility check + ready-to-use Google Business Profile content. Original tool.")
 
 def get_secret(name: str, label: str):
     try:
@@ -62,7 +62,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
     if not business_name or not keyword or not location_input:
         st.error("Please provide a business name, keyword, and a location.")
     else:
-        with st.spinner("Running audit and generating insights..."):
+        with st.spinner("Running audit and creating owner-friendly content..."):
             try:
                 client = serpapi.Client(api_key=serpapi_key)
                 params = {
@@ -125,38 +125,43 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                     comp_text = "\n".join([f"{name}: {count}" for name, count in competitors])
 
                     summary = df.to_string(index=False)
-                    prompt = f"""You are a practical local SEO advisor. Analyze results for "{keyword}" near {location_input}.
-Target business: {business_name}
-Found: {target_found}
+                    prompt = f"""You are helping a local business owner who is not very comfortable with computers.
+Business: {business_name}
+Keyword: {keyword}
+Location: {location_input}
+Found in Google results: {target_found}
 Position: {target_position}
 Top results:
 {summary}
 Competitors:
 {comp_text}
 
-Respond in clear sections:
+Write everything in simple, everyday language. Use short sentences.
+
+Create these sections:
 
 1. ACTION PLAN
-5-8 practical bullet points.
+5-7 easy steps the owner can take.
 
-2. SAMPLE GOOGLE BUSINESS PROFILE POST
-One ready-to-use post (3-5 sentences) with a call to action.
+2. NEW BUSINESS DESCRIPTION
+A short description (under 750 characters) they can copy and paste into their Google Business Profile.
 
-3. LOCAL PAGE OUTLINE
-3-4 headings with a one-sentence description each.
+3. THREE READY-TO-POST UPDATES
+Three short posts they can add to their Google Business Profile. Label them clearly (Post 1, Post 2, Post 3).
 
-4. SHORT ARTICLE SNIPPET
-A 120-150 word sample paragraph a local page could use.
+4. SUGGESTED CATEGORIES
+Primary category and a few extra ones to add.
 
-5. WEBSITE IMPROVEMENT TIPS
-3-5 specific, realistic tips.
+5. PHOTO IDEAS
+5 simple photo ideas.
 
-6. REVIEW RESPONSE IDEAS
-Two short example responses (one positive, one neutral/negative).
+6. HOW TO REPLY TO REVIEWS
+One sample reply for a good review and one for a so-so review.
 
-7. SUGGESTED KEYWORDS
-5 related keywords or phrases to target.
-Do not invent data. Keep everything concise and useful."""
+7. EXTRA KEYWORDS
+A few related words or phrases they should use.
+
+Keep it friendly and easy to follow. Do not invent facts about the business."""
 
                     oai = OpenAI(api_key=openai_key)
                     completion = oai.chat.completions.create(
@@ -195,13 +200,12 @@ if st.session_state.results_ready and st.session_state.df is not None:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
-        # Google Maps URL using /search/ so it redirects to the final destination page
         name_encoded = quote_plus(business_name)
         maps_url = (
             f"https://www.google.com/maps/search/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         )
-        st.link_button(f"Go to {business_name}", maps_url, type="primary")
+        st.link_button(f"GO to {business_name}", maps_url, type="primary")
         st.caption(f"URL: {maps_url}")
     else:
         st.warning(f"**{business_name}** was not found in the top local results for this keyword. It may still have a Google Business Profile but is not ranking for this search.")
@@ -232,30 +236,57 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.subheader("Top Competitors")
     st.text(st.session_state.competitors)
 
-    st.subheader("AI Insights & Content Tools")
+    st.subheader("Owner-Friendly Content (Copy and Paste)")
+    st.info("The sections below are written in simple language so the business owner can copy and paste them into their Google Business Profile.")
     st.markdown(st.session_state.sample_content)
 
-    report = f"""AI Local Map Auditor Report
-Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-Business: {business_name}
-Keyword: {keyword}
+    # Owner-friendly report with guide at the top
+    how_to_guide = """HOW TO ADD THIS TO YOUR GOOGLE BUSINESS PROFILE
+================================================
+
+This report gives you ready-to-use words you can copy and paste.
+
+Follow these simple steps:
+
+1. Open Google Maps on your phone or computer.
+2. Search for your business name.
+3. Tap or click on your business.
+4. Look for “Edit profile” or “Manage this business” and open it.
+5. Copy the New Business Description from this report and paste it into the description box.
+6. To add a post: look for “Add update” or “Create post”, then copy one of the three posts below and paste it.
+7. Add any suggested categories if you see the option.
+8. Take or upload photos based on the photo ideas.
+9. When customers leave reviews, use the sample replies as a guide.
+
+You can do these steps one at a time. You do not have to finish everything in one sitting.
+
+================================================
+"""
+
+    report = f"""{how_to_guide}
+LOCAL VISIBILITY REPORT FOR {business_name.upper()}
+Date: {datetime.now().strftime('%B %d, %Y')}
+Keyword searched: {keyword}
 Location: {location_input}
 Visibility Score: {st.session_state.visibility_score}%
-Listed: {'Yes' if st.session_state.target_found else 'No'}
-Position: {st.session_state.target_position or 'N/A'}
+Found in top results: {'Yes' if st.session_state.target_found else 'No'}
+Position: {st.session_state.target_position or 'Not in top results'}
 
-NAP:
+BUSINESS DETAILS
 {st.session_state.auto_nap}
 
-Top 5 Local Results:
+TOP 5 LOCAL RESULTS
 {st.session_state.df.to_string(index=False)}
 
-Competitors:
+TOP COMPETITORS
 {st.session_state.competitors}
 
-AI Insights & Content:
+READY-TO-USE CONTENT
 {st.session_state.sample_content}
-"""
-    st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("The Go to Business link now uses /maps/search/ so it redirects to the final destination page.")
+================================================
+End of report. You can print this or email it to yourself.
+"""
+    st.download_button("Download Owner-Friendly Report", report, file_name=f"{business_name.replace(' ', '_')}_report.txt", mime="text/plain")
+
+st.sidebar.info("The downloaded report now includes a simple step-by-step guide at the top so non-technical owners can follow along.")
