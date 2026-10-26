@@ -11,15 +11,17 @@ import re
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.graphics.shapes import Drawing, Circle, String
+from reportlab.graphics import renderPDF
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
 st.title("🗺️ AI Local Map Auditor")
-st.caption("Local visibility check + owner-friendly PDF reports. Original tool.")
+st.caption("Local visibility check + Report Card with Circular Progress Bar. Original tool.")
 
 def get_secret(name: str, label: str):
     try:
@@ -79,7 +81,57 @@ if "results_ready" not in st.session_state:
     st.session_state.visibility_score = None
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
+    st.session_state.report_card = {}
 
+# ---------- REPORT CARD QUESTIONS ----------
+st.subheader("Google Maps Profile Report Card")
+st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
+
+questions = [
+    "1. Is the Business Details (NAP) correctly listed?",
+    "2. Does the Primary category match the main service?",
+    "3. Are the business's opening hours listed in their Google Maps profile?",
+    "4. Is the business's VERIFIED NAP and Google Maps pin aligned in the right place?",
+    "5. Are the business's services listed on Google Maps profile?",
+    "6. Is the 'Response from the owner' appearing to respond to reviews?",
+    "7. Does the business have an active website listed?",
+    "8. Does the business have at least 10 positive Google Reviews?",
+    "9. Does the business's name, address, and phone number match the contact information on their website?",
+    "10. Are there any duplicate business listings for the same business?",
+]
+
+report_card = {}
+cols = st.columns(2)
+for i, q in enumerate(questions):
+    with cols[i % 2]:
+        report_card[q] = st.radio(q, ["PASS", "FAIL"], index=1, horizontal=True, key=f"q{i}")
+
+st.session_state.report_card = report_card
+
+pass_count = sum(1 for v in report_card.values() if v == "PASS")
+score = pass_count * 10
+
+if score >= 80:
+    bar_color = GOOGLE_GREEN
+    color_name = "Green"
+elif score >= 50:
+    bar_color = GOOGLE_YELLOW
+    color_name = "Yellow"
+else:
+    bar_color = GOOGLE_RED
+    color_name = "Red"
+
+if score == 100:
+    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a well-optimized Google Maps profile."
+elif score in (80, 90):
+    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a Google Maps profile that need improvement."
+else:
+    statement = f"**{business_name if 'business_name' in dir() else 'This business'}** has a poorly-optimized Google Maps profile."
+
+st.metric("Current Report Card Score", f"{score} out of 100", help=f"Border color: {color_name}")
+st.info(statement)
+
+# ---------- MAIN AUDIT FORM ----------
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. C&L Landscape")
@@ -181,8 +233,7 @@ A short description (under 750 characters) they can copy and paste into their Go
 
 3. THREE READY-TO-POST UPDATES
 Create three short posts that are timely for the current season ({current_season}). 
-Make them relevant to seasonal changes, weather, or customer needs right now 
-(for example: spring cleanup, summer watering tips, fall leaf removal, winter prep, holiday offers, etc.). 
+Make them relevant to seasonal changes, weather, or customer needs right now. 
 Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
 
 4. SUGGESTED CATEGORIES
@@ -238,90 +289,78 @@ def format_address(addr):
         return f"{street}<br/>{rest}"
     return truncate(addr, 30)
 
+def create_circular_progress(score, bar_color):
+    """Create a simple circular progress indicator for the PDF."""
+    d = Drawing(200, 200)
+    # Thick outer circle
+    d.add(Circle(100, 100, 80, strokeColor=bar_color, strokeWidth=18, fillColor=colors.white))
+    # Inner white circle
+    d.add(Circle(100, 100, 55, strokeColor=colors.white, fillColor=colors.white))
+    # Score text
+    d.add(String(100, 105, f"{score}", fontSize=28, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(100, 80, "out of 100", fontSize=12, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
+    return d
+
 def create_pdf_report():
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
     story = []
 
+    # Logo
     try:
         logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
         logo.hAlign = 'CENTER'
         story.append(logo)
-        story.append(Spacer(1, 0.15*inch))
+        story.append(Spacer(1, 0.1*inch))
     except Exception:
         story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
 
-    title_style1 = ParagraphStyle(
-        'TitleLine1',
-        parent=styles['Normal'],
-        textColor=GOOGLE_BLUE,
-        alignment=TA_CENTER,
-        fontSize=14,
-        spaceAfter=2
-    )
-    title_style2 = ParagraphStyle(
-        'TitleLine2',
-        parent=styles['Heading1'],
-        textColor=GOOGLE_BLUE,
-        alignment=TA_CENTER,
-        fontSize=16,
-        spaceAfter=6
-    )
+    # Two-line title
+    title_style1 = ParagraphStyle('TitleLine1', parent=styles['Normal'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=14, spaceAfter=2)
+    title_style2 = ParagraphStyle('TitleLine2', parent=styles['Heading1'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=16, spaceAfter=4)
     story.append(Paragraph("Local Visibility Report for", title_style1))
     story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
 
-    date_style = ParagraphStyle(
-        'PrepDate',
-        parent=styles['Normal'],
-        textColor=colors.black,
-        alignment=TA_CENTER,
-        fontSize=11,
-        fontName='Helvetica-Bold',
-        spaceAfter=10
-    )
+    date_style = ParagraphStyle('PrepDate', parent=styles['Normal'], textColor=colors.black, alignment=TA_CENTER, fontSize=11, fontName='Helvetica-Bold', spaceAfter=8)
     prepared_date = datetime.now().strftime("%B %d, %Y")
     story.append(Paragraph(f"This report was prepared on {prepared_date}", date_style))
     story.append(Spacer(1, 0.1*inch))
 
-    if st.session_state.target_lat and st.session_state.target_lon:
-        name_encoded = quote_plus(business_name)
-        maps_url = (
-            f"https://www.google.com/maps/search/{name_encoded}/"
-            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
-        )
+    # ========== CIRCULAR PROGRESS BAR + STATEMENT + REPORT CARD ==========
+    story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
+    story.append(Spacer(1, 0.1*inch))
 
-        # Google Maps logo — 3x larger (3.6" × 1.2")
-        try:
-            maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
-            maps_logo.hAlign = 'CENTER'
-            story.append(maps_logo)
-            story.append(Spacer(1, 0.1*inch))
-        except Exception:
-            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE, fontSize=18)))
+    # Circular progress
+    progress_drawing = create_circular_progress(score, bar_color)
+    story.append(progress_drawing)
+    story.append(Spacer(1, 0.1*inch))
 
-        link_style = ParagraphStyle(
-            'MapLink',
-            parent=styles['Normal'],
-            textColor=GOOGLE_BLUE,
-            fontSize=12,
-            alignment=TA_CENTER,
-            spaceAfter=8
-        )
-        story.append(Paragraph(
-            f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>',
-            link_style
-        ))
-        story.append(Spacer(1, 0.15*inch))
+    # Statement
+    stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, spaceAfter=8)
+    story.append(Paragraph(statement.replace("**", ""), stmt_style))
+    story.append(Spacer(1, 0.1*inch))
 
-    guide_style = ParagraphStyle(
-        'Guide',
-        parent=styles['Normal'],
-        textColor=GOOGLE_RED,
-        fontSize=11,
-        leading=14,
-        spaceAfter=6
-    )
+    # Report Card results table
+    rc_data = [["Question", "Result"]]
+    for q, result in st.session_state.report_card.items():
+        rc_data.append([Paragraph(q, styles['Normal']), result])
+    rc_table = Table(rc_data, colWidths=[5.2*inch, 1.3*inch])
+    rc_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+    ]))
+    story.append(rc_table)
+    story.append(Spacer(1, 0.25*inch))
+
+    # ========== HOW TO OPTIMIZE HEADING ==========
+    guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
     1. Open Google Maps on your smartphone, tablet, or computer.<br/>
@@ -330,7 +369,7 @@ def create_pdf_report():
     4. If asked, sign in with the Google account that owns the business.<br/>
     5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-    7. To add a post: look for “Add update” or “Create post”, copy and paste one of the three posts below.<br/>
+    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
     8. Add any suggested categories if the option is available.<br/>
     9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
@@ -338,6 +377,7 @@ def create_pdf_report():
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
+    # Summary table
     summary_data = [
         ["Field", "Value"],
         ["Business", business_name],
@@ -362,17 +402,17 @@ def create_pdf_report():
     story.append(summary_table)
     story.append(Spacer(1, 0.2*inch))
 
+    # NAP
     story.append(Paragraph("<b>Business Details (NAP)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
+    # Top results table
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top 5 Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
-
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
         cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
-
         for _, row in st.session_state.df.iterrows():
             title_p = Paragraph(truncate(str(row.get("Title", "")), 30), cell_style)
             address_p = Paragraph(format_address(str(row.get("Address", ""))), cell_style)
@@ -385,7 +425,6 @@ def create_pdf_report():
                 address_p,
                 phone_p,
             ])
-
         results_table = Table(table_data, colWidths=[0.5*inch, 1.6*inch, 0.55*inch, 0.6*inch, 1.8*inch, 1.1*inch])
         results_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
@@ -402,13 +441,30 @@ def create_pdf_report():
         story.append(results_table)
         story.append(Spacer(1, 0.2*inch))
 
+    # Competitors
     story.append(Paragraph("<b>Top Competitors</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
+    # AI Content
     story.append(Paragraph("<b>Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     content_para = Paragraph(st.session_state.sample_content.replace("\n", "<br/>"), styles['Normal'])
     story.append(content_para)
+
+    # Google Maps link
+    if st.session_state.target_lat and st.session_state.target_lon:
+        name_encoded = quote_plus(business_name)
+        maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
+        try:
+            maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
+            maps_logo.hAlign = 'CENTER'
+            story.append(Spacer(1, 0.2*inch))
+            story.append(maps_logo)
+            story.append(Spacer(1, 0.05*inch))
+        except Exception:
+            pass
+        link_style = ParagraphStyle('MapLink', parent=styles['Normal'], textColor=GOOGLE_BLUE, fontSize=11, alignment=TA_CENTER)
+        story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
 
     doc.build(story)
     buffer.seek(0)
@@ -416,19 +472,14 @@ def create_pdf_report():
 
 if st.session_state.results_ready and st.session_state.df is not None:
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
-
     st.subheader("Top 5 Local Results")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_found and st.session_state.target_lat:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
-
         name_encoded = quote_plus(business_name)
-        maps_url = (
-            f"https://www.google.com/maps/search/{name_encoded}/"
-            f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
-        )
+        maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
         st.link_button(f"GO to {business_name}", maps_url, type="primary")
         st.caption(f"URL: {maps_url}")
     else:
@@ -471,4 +522,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Google Maps logo is set to 3.6 inches wide × 1.2 inches tall (3× original size).")
+st.sidebar.info("Report Card with Circular Progress Bar is now included. Tick PASS/FAIL and generate the PDF.")
