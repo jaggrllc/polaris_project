@@ -122,15 +122,15 @@ st.subheader("Google Maps Profile Report Card")
 st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
 
 questions = [
-    "1. Is the Business Details (NAP) correctly listed?",
-    "2. Does the Primary category match the main service?",
-    "3. Are the business's opening hours listed in their Google Maps profile?",
-    "4. Is the business's VERIFIED NAP and Google Maps pin aligned in the right place?",
-    "5. Are the business's services listed on Google Maps profile?",
+    "1. Is the business details (VERIFIED NAP: name, address, and phone number) correctly listed?",
+    "2. Does the primary category match the main service?",
+    "3. Are the business's opening hours listed on their Google Maps profile?",
+    "4. Is the business's VERIFIED NAP and Google Maps Pin aligned in the right place?",
+    "5. Are the business's services listed on their Google Maps profile?",
     "6. Is the 'Response from the owner' appearing to respond to reviews?",
     "7. Does the business have an active website listed?",
-    "8. Does the business have at least 10 positive Google Reviews?",
-    "9. Does the business's name, address, and phone number match the contact information on their website?",
+    "8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
+    "9. Does the business's VERIFIED NAP match the contact information on their website?",
     "10. Are there any duplicate business listings for the same business?",
 ]
 
