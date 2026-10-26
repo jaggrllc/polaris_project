@@ -59,18 +59,41 @@ def get_current_season():
         return "Fall"
 
 def clean_ai_content(text):
-    """Clean AI-generated markdown so it looks polished in the PDF."""
+    """Clean AI content and force clean section headings."""
     if not text:
         return ""
     # Convert **bold** to real bold
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # Remove ### headings and the following space
+    # Remove ### and any H-style prefixes
     text = re.sub(r'#+\s*', '', text)
-    # Replace numbered list items with stars (especially under ACTION PLAN)
-    text = re.sub(r'(?m)^(\d+)\.\s+', '★ ', text)
-    # Clean up any remaining stray markdown artifacts
+    text = re.sub(r'(?i)^h[1-6]\.?\s*', '', text, flags=re.MULTILINE)
+    # Force the exact section headings the user wants
+    replacements = {
+        r'(?i)1\.?\s*ACTION PLAN': '1. ACTION PLAN',
+        r'(?i)2\.?\s*NEW BUSINESS DESCRIPTION': '2. NEW BUSINESS DESCRIPTION',
+        r'(?i)3\.?\s*THREE READY-TO-POST UPDATES': '3. THREE READY-TO-POST UPDATES',
+        r'(?i)4\.?\s*SUGGESTED CATEGORIES': '4. SUGGESTED CATEGORIES',
+        r'(?i)5\.?\s*PHOTO IDEAS': '5. PHOTO IDEAS',
+        r'(?i)6\.?\s*HOW TO REPLY TO REVIEWS': '6. HOW TO REPLY TO REVIEWS',
+        r'(?i)7\.?\s*EXTRA KEYWORDS': '7. EXTRA KEYWORDS',
+    }
+    for pattern, replacement in replacements.items():
+        text = re.sub(pattern, replacement, text)
+    # Replace only the sub-steps (not the main section numbers) with stars
+    # This targets lines that start with a number followed by a period and space, but not the main section titles
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if re.match(r'^[1-7]\.\s+(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
+            cleaned_lines.append(stripped)
+        elif re.match(r'^\d+\.\s+', stripped):
+            cleaned_lines.append('★ ' + re.sub(r'^\d+\.\s+', '', stripped))
+        else:
+            cleaned_lines.append(line)
+    text = '\n'.join(cleaned_lines)
+    # Final cleanup
     text = text.replace('**', '').replace('###', '')
-    # Normalize line breaks
     text = text.replace('\n', '<br/>')
     return text
 
@@ -458,7 +481,7 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Google Maps logo + link above DIY section
+    # Google Maps logo + link
     if st.session_state.target_lat and st.session_state.target_lon:
         name_encoded = quote_plus(business_name)
         maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
@@ -536,4 +559,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("DIY content in the PDF is now cleaned: stars instead of numbers, bold instead of **, and ### removed.")
+st.sidebar.info("DIY section headings now appear exactly as 1. ACTION PLAN, 2. NEW BUSINESS DESCRIPTION, etc. (no H prefix).")
