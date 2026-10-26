@@ -6,7 +6,7 @@ import folium
 from streamlit_folium import st_folium
 from datetime import datetime
 from collections import Counter
-from urllib.parse import quote
+from urllib.parse import quote_plus
 import re
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
@@ -195,8 +195,8 @@ if st.session_state.results_ready and st.session_state.df is not None:
         st.success("Business found — Auto-captured NAP:")
         st.code(st.session_state.auto_nap)
 
-        # Google Maps URL with Business Name included
-        name_encoded = quote(business_name.replace(" ", "+"))
+        # Google Maps URL with Business Name in the path (like the Dan The Landscapin Man example)
+        name_encoded = quote_plus(business_name)
         maps_url = (
             f"https://www.google.com/maps/place/{name_encoded}/"
             f"@{st.session_state.target_lat},{st.session_state.target_lon},15z"
@@ -258,4 +258,4 @@ AI Insights & Content:
 """
     st.download_button("Download Full Report", report, file_name="local_audit_report.txt", mime="text/plain")
 
-st.sidebar.info("The GO to Business link now includes the business name in the Google Maps URL.")
+st.sidebar.info("The GO to Business link now includes the business name in the Google Maps URL path.")
