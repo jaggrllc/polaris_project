@@ -116,6 +116,7 @@ if "results_ready" not in st.session_state:
     st.session_state.competitors = ""
     st.session_state.sample_content = ""
     st.session_state.report_card = {}
+    st.session_state.owner_letter = ""
 
 # ---------- REPORT CARD QUESTIONS ----------
 st.subheader("Google Maps Profile Report Card")
@@ -141,6 +142,18 @@ for i, q in enumerate(questions):
         report_card[q] = st.radio(q, ["PASS", "FAIL"], index=1, horizontal=True, key=f"q{i}")
 
 st.session_state.report_card = report_card
+
+# ---------- EDITABLE LETTER TO OWNER (appears at bottom of PDF) ----------
+st.subheader("Letter to Business Owner")
+st.caption("Type or paste a personal letter. It will appear at the bottom of the downloaded Report Card PDF.")
+owner_letter = st.text_area(
+    "Letter to the business owner",
+    value=st.session_state.owner_letter,
+    height=220,
+    placeholder="Dear [Business Owner],\n\nThank you for the opportunity to review your Google Maps profile...\n\nBest regards,\nJaguar Group LLC",
+    key="owner_letter_input"
+)
+st.session_state.owner_letter = owner_letter
 
 pass_count = sum(1 for v in report_card.values() if v == "PASS")
 score = pass_count * 10
@@ -498,6 +511,23 @@ def create_pdf_report():
     content_para = Paragraph(cleaned_content, styles['Normal'])
     story.append(content_para)
 
+    # ---------- LETTER TO OWNER AT BOTTOM OF PDF ----------
+    if st.session_state.get("owner_letter") and st.session_state.owner_letter.strip():
+        story.append(Spacer(1, 0.3*inch))
+        letter_style = ParagraphStyle(
+            'OwnerLetter',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=14,
+            spaceAfter=6,
+            textColor=colors.black
+        )
+        story.append(Paragraph("<b>Letter to the Business Owner</b>", ParagraphStyle('LetterHead', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
+        story.append(Spacer(1, 0.1*inch))
+        # Preserve line breaks
+        letter_text = st.session_state.owner_letter.replace("\n", "<br/>")
+        story.append(Paragraph(letter_text, letter_style))
+
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -547,7 +577,6 @@ if st.session_state.results_ready and st.session_state.df is not None:
     st.markdown(st.session_state.sample_content)
 
     pdf_buffer = create_pdf_report()
-    # Renamed button
     st.download_button(
         label="Download Google Maps Profile Report Card",
         data=pdf_buffer,
@@ -555,4 +584,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         mime="application/pdf"
     )
 
-st.sidebar.info("Download button renamed to Download Google Maps Profile Report Card.")
+st.sidebar.info("Editable letter box added under the 10 questions. The letter appears at the bottom of the PDF.")
