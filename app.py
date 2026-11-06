@@ -129,7 +129,7 @@ questions = [
     "6. Is the 'Response from the owner' appearing to respond to reviews?",
     "7. Does the business have an active website listed?",
     "8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
-    "9. Does the business's VERIFIED NAP match the contact information on their website?",
+    "9. Does the business's VERIFIED NAP match the contact info on their website?",
     "10. Are there any duplicate business listings for the same business?",
 ]
 
