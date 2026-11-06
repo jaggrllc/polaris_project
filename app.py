@@ -124,7 +124,7 @@ questions = [
     "1. Is the business details (VERIFIED NAP: name, address, and phone number) correctly listed?",
     "2. Does the primary category match the main service?",
     "3. Are the business's opening hours listed on their Google Maps profile?",
-    "4. Is the business's VERIFIED NAP and Google Maps Pin aligned in the right place?",
+    "4. Are the business's VERIFIED NAP and Google Maps Pin aligned correctly?",
     "5. Are the business's services listed on their Google Maps profile?",
     "6. Is the 'Response from the owner' appearing to respond to reviews?",
     "7. Does the business have an active website listed?",
