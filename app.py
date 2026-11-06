@@ -536,55 +536,6 @@ def create_pdf_report():
     return buffer
 
 if st.session_state.results_ready and st.session_state.df is not None:
-    # NAP verification check for the target business
-    nap_verified = bool(
-        business_name
-        and st.session_state.get("target_address")
-        and st.session_state.get("target_phone")
-        and str(st.session_state.target_address).strip() not in ("", "N/A")
-        and str(st.session_state.target_phone).strip() not in ("", "N/A")
-    )
-
-    if not nap_verified:
-        st.markdown(
-            """
-            <div id="nap-warning" style="
-                position: fixed;
-                top: 3.75rem;
-                left: 0;
-                right: 0;
-                background: #ff0000;
-                color: white;
-                font-size: 28px;
-                font-weight: bold;
-                text-align: center;
-                padding: 16px 10px;
-                z-index: 99999;
-                animation: blink 0.6s linear infinite;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-                margin: 0;
-            ">
-                NOT NAP VERIFIED
-            </div>
-            <style>
-                @keyframes blink {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.15; }
-                }
-                header[data-testid="stHeader"] {
-                    z-index: 99998;
-                }
-            </style>
-            <script>
-                setTimeout(function() {
-                    var el = document.getElementById('nap-warning');
-                    if (el) el.style.display = 'none';
-                }, 30000);
-            </script>
-            """,
-            unsafe_allow_html=True,
-        )
-
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
     st.subheader("Top Local Results (NAP Verified Only)")
     st.dataframe(st.session_state.df, use_container_width=True)
