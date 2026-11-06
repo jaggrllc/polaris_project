@@ -281,7 +281,7 @@ Create these sections:
 
 1. ACTION PLAN
 
-5-7 easy steps the owner can take.
+1-7 easy steps the owner can take.
 
 2. NEW BUSINESS DESCRIPTION
 
