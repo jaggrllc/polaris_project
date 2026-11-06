@@ -550,16 +550,19 @@ if st.session_state.results_ready and st.session_state.df is not None:
             """
             <div id="nap-warning" style="
                 position: fixed;
-                top: 0; left: 0; right: 0;
+                top: 3.75rem;
+                left: 0;
+                right: 0;
                 background: #ff0000;
                 color: white;
                 font-size: 28px;
                 font-weight: bold;
                 text-align: center;
-                padding: 14px;
-                z-index: 9999;
+                padding: 16px 10px;
+                z-index: 99999;
                 animation: blink 0.6s linear infinite;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                margin: 0;
             ">
                 NOT NAP VERIFIED
             </div>
@@ -567,6 +570,9 @@ if st.session_state.results_ready and st.session_state.df is not None:
                 @keyframes blink {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.15; }
+                }
+                header[data-testid="stHeader"] {
+                    z-index: 99998;
                 }
             </style>
             <script>
@@ -629,5 +635,4 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
-
 st.sidebar.info("Editable letter box added under the 10 questions. The letter appears at the bottom of the PDF.")
