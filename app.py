@@ -428,7 +428,7 @@ def create_pdf_report():
     2. Search for your business name and tap or click on it.<br/>
     3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
     4. If asked, sign in with the Google account that owns the business.<br/>
-    5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
+    5. In your Google Business Profile, edit the sections you want to change.<br/>
     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
     7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
     8. Add any suggested categories if the option is available.<br/>
