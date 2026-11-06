@@ -9,13 +9,7 @@ from collections import Counter
 from urllib.parse import quote_plus
 import re
 from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER
-from reportlab.graphics.shapes import Drawing, Circle, String
+from weasyprint import HTML
 
 st.set_page_config(page_title="AI Local Map Auditor", page_icon="🗺️", layout="wide")
 
@@ -93,10 +87,10 @@ def clean_ai_content(text):
     text = text.replace('\n', '<br/>')
     return text
 
-GOOGLE_BLUE = colors.HexColor("#4285F4")
-GOOGLE_RED = colors.HexColor("#EA4335")
-GOOGLE_YELLOW = colors.HexColor("#FBBC05")
-GOOGLE_GREEN = colors.HexColor("#34A853")
+GOOGLE_BLUE = "#4285F4"
+GOOGLE_RED = "#EA4335"
+GOOGLE_YELLOW = "#FBBC05"
+GOOGLE_GREEN = "#34A853"
 
 serpapi_key = get_secret("SERPAPI_KEY", "SerpAPI Key")
 openai_key = get_secret("OPENAI_API_KEY", "OpenAI API Key")
@@ -143,7 +137,7 @@ for i, q in enumerate(questions):
 
 st.session_state.report_card = report_card
 
-# ---------- EDITABLE LETTER TO OWNER (appears at bottom of PDF) ----------
+# ---------- EDITABLE LETTER TO OWNER ----------
 st.subheader("Letter to Business Owner")
 st.caption("Type or paste a personal letter. It will appear at the bottom of the downloaded Report Card PDF.")
 owner_letter = st.text_area(
@@ -168,7 +162,8 @@ else:
     bar_color = GOOGLE_RED
     color_name = "Red"
 
-biz_display = business_name if 'business_name' in locals() and business_name else "This business"
+biz_display = "This business"
+statement = ""
 if score == 100:
     statement = f"{biz_display} has a well-optimized Google Maps profile."
 elif score in (80, 90):
@@ -221,12 +216,13 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
                         title = item.get("title") or ""
+                        address = item.get("address") or ""
                         rows.append({
                             "Position": item.get("position"),
                             "Title": title,
                             "Rating": item.get("rating"),
                             "Reviews": item.get("reviews"),
-                            "Address": item.get("address"),
+                            "Address": address,
                             "Phone": phone,
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
@@ -234,7 +230,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         if norm_target and norm_target in normalize(title):
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
-                            target_address = item.get("address") or ""
+                            target_address = address
                             target_phone = phone
 
                     if business_address.strip():
@@ -243,6 +239,15 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         target_phone = business_phone.strip()
 
                     df = pd.DataFrame(rows[:5])
+
+                    # Only keep NAP-verified businesses (have both Address and Phone)
+                    if not df.empty:
+                        df = df[
+                            df["Address"].notna() & df["Phone"].notna()
+                            & (df["Address"].astype(str).str.strip() != "")
+                            & (df["Phone"].astype(str).str.strip() != "")
+                        ]
+
                     target_found = any(norm_target in normalize(str(r.get("title") or "")) for r in main_local)
                     target_position = next(
                         (r.get("position") for r in main_local
@@ -338,203 +343,173 @@ def format_address(addr):
         return f"{street}<br/>{rest}"
     return truncate(addr, 30)
 
-def create_circular_progress(score, bar_color):
-    size = 500
-    center = size / 2
-    radius = 200
-    stroke = 45
-    d = Drawing(size, size)
-    d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
-    d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    d.add(String(center, center + 15, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(center, center - 55, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
-    return d
-
 def create_pdf_report():
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.5*inch)
-    styles = getSampleStyleSheet()
-    story = []
+    score = sum(1 for v in st.session_state.report_card.values() if v == "PASS") * 10
+    bar_color = GOOGLE_GREEN if score >= 80 else GOOGLE_YELLOW if score >= 50 else GOOGLE_RED
 
-    try:
-        logo = Image("Jaguar-Group-LLC.png", width=1*inch, height=1*inch)
-        logo.hAlign = 'CENTER'
-        story.append(logo)
-        story.append(Spacer(1, 0.1*inch))
-    except Exception:
-        story.append(Paragraph("<b>Jaguar Group LLC</b>", styles['Title']))
-
-    title_style1 = ParagraphStyle('TitleLine1', parent=styles['Normal'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=14, spaceAfter=2)
-    title_style2 = ParagraphStyle('TitleLine2', parent=styles['Heading1'], textColor=GOOGLE_BLUE, alignment=TA_CENTER, fontSize=16, spaceAfter=4)
-    story.append(Paragraph("Local Visibility Report for", title_style1))
-    story.append(Paragraph(f"<b>{business_name}</b>", title_style2))
-
-    date_style = ParagraphStyle('PrepDate', parent=styles['Normal'], textColor=colors.black, alignment=TA_CENTER, fontSize=11, fontName='Helvetica-Bold', spaceAfter=8)
-    prepared_date = datetime.now().strftime("%B %d, %Y")
-    story.append(Paragraph(f"This report was prepared by Jaguar Group LLC on {prepared_date}.", date_style))
-    story.append(Spacer(1, 0.1*inch))
-
-    story.append(Paragraph("<b>Google Maps Profile Report Card</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE, alignment=TA_CENTER)))
-    story.append(Spacer(1, 0.1*inch))
-
-    progress_drawing = create_circular_progress(score, bar_color)
-    progress_table = Table([[progress_drawing]], colWidths=[6.5*inch])
-    progress_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    story.append(progress_table)
-    story.append(Spacer(1, 0.15*inch))
-
-    stmt_style = ParagraphStyle('Stmt', parent=styles['Normal'], alignment=TA_CENTER, fontSize=12, leading=15, fontName='Helvetica-Bold', spaceAfter=8)
-    story.append(Paragraph(statement, stmt_style))
-    story.append(Spacer(1, 0.1*inch))
-
-    rc_data = [["Google Maps Report Card", "Test Results"]]
-    for q, result in st.session_state.report_card.items():
-        rc_data.append([Paragraph(q, styles['Normal']), result])
-    rc_table = Table(rc_data, colWidths=[5.2*inch, 1.3*inch])
-    rc_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-    ]))
-    story.append(rc_table)
-    story.append(Spacer(1, 0.25*inch))
-
-    guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
-    story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
-    guide_text = """
-    1. Open Google Maps on your smartphone, tablet, or computer.<br/>
-    2. Search for your business name and tap or click on it.<br/>
-    3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
-    4. If asked, sign in with the Google account that owns the business.<br/>
-    5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
-    6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
-    8. Add any suggested categories if the option is available.<br/>
-    9. Upload photos based on the photo ideas.<br/>
-    10. When customers leave reviews, use the sample replies as a guide.
+    progress_svg = f"""
+    <svg width="220" height="220" viewBox="0 0 220 220" style="margin: 10px auto; display: block;">
+        <circle cx="110" cy="110" r="90" stroke="{bar_color}" stroke-width="22" fill="none"/>
+        <text x="110" y="120" text-anchor="middle" font-size="52" font-weight="bold" fill="#000">{score}</text>
+        <text x="110" y="150" text-anchor="middle" font-size="16" fill="#333">out of 100</text>
+    </svg>
     """
-    story.append(Paragraph(guide_text, styles['Normal']))
-    story.append(Spacer(1, 0.2*inch))
 
-    summary_data = [
-        ["Field", "Value"],
-        ["Business", business_name],
-        ["Keyword", keyword],
-        ["Location", location_input],
-        ["Visibility Score", f"{st.session_state.visibility_score}%"],
-        ["Found in Top Results", "Yes" if st.session_state.target_found else "No"],
-        ["Position", str(st.session_state.target_position or "Not in top results")],
-    ]
-    summary_table = Table(summary_data, colWidths=[2*inch, 4.5*inch])
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-    ]))
-    story.append(Paragraph("<b>Report Card Summary</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
-    story.append(summary_table)
-    story.append(Spacer(1, 0.2*inch))
+    # Only NAP-verified rows
+    df_nap = st.session_state.df
+    results_rows = ""
+    if df_nap is not None and not df_nap.empty:
+        for _, row in df_nap.iterrows():
+            results_rows += f"""
+            <tr>
+                <td>{row.get('Position','')}</td>
+                <td>{truncate(str(row.get('Title','')), 30)}</td>
+                <td>{row.get('Rating','')}</td>
+                <td>{row.get('Reviews','')}</td>
+                <td>{format_address(str(row.get('Address','')))}</td>
+                <td>{truncate(str(row.get('Phone','')), 18)}</td>
+            </tr>"""
 
-    story.append(Paragraph("<b>Business Details (NAP: Name, Address, Phone Number)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_YELLOW)))
-    story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
-    story.append(Spacer(1, 0.15*inch))
-
-    if st.session_state.df is not None and not st.session_state.df.empty:
-        story.append(Paragraph("<b>Top Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
-        header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
-        table_data = [header]
-        cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
-        for _, row in st.session_state.df.iterrows():
-            title_p = Paragraph(truncate(str(row.get("Title", "")), 30), cell_style)
-            address_p = Paragraph(format_address(str(row.get("Address", ""))), cell_style)
-            phone_p = Paragraph(truncate(str(row.get("Phone", "")), 18), cell_style)
-            table_data.append([
-                str(row.get("Position", "")),
-                title_p,
-                str(row.get("Rating", "")),
-                str(row.get("Reviews", "")),
-                address_p,
-                phone_p,
-            ])
-        results_table = Table(table_data, colWidths=[0.5*inch, 1.6*inch, 0.55*inch, 0.6*inch, 1.8*inch, 1.1*inch])
-        results_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), GOOGLE_BLUE),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ]))
-        story.append(results_table)
-        story.append(Spacer(1, 0.2*inch))
-
-    story.append(Paragraph("<b>Top Competitors</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_GREEN)))
-    story.append(Paragraph(st.session_state.competitors.replace("\n", "<br/>"), styles['Normal']))
-    story.append(Spacer(1, 0.15*inch))
-
-    if st.session_state.target_lat and st.session_state.target_lon:
-        name_encoded = quote_plus(business_name)
-        maps_url = f"https://www.google.com/maps/search/{name_encoded}/@{st.session_state.target_lat},{st.session_state.target_lon},15z"
-        try:
-            maps_logo = Image("google-maps-logo.png", width=3.6*inch, height=1.2*inch)
-            maps_logo.hAlign = 'CENTER'
-            story.append(Spacer(1, 0.15*inch))
-            story.append(maps_logo)
-            story.append(Spacer(1, 0.05*inch))
-        except Exception:
-            story.append(Paragraph("<b>Google Maps</b>", ParagraphStyle('MapLogoFallback', parent=styles['Normal'], alignment=TA_CENTER, textColor=GOOGLE_BLUE)))
-        link_style = ParagraphStyle('MapLink', parent=styles['Normal'], textColor=GOOGLE_BLUE, fontSize=11, alignment=TA_CENTER, spaceAfter=8)
-        story.append(Paragraph(f'<link href="{maps_url}" color="blue"><u>View on Google Maps</u></link>', link_style))
-        story.append(Spacer(1, 0.15*inch))
-
-    story.append(Paragraph("<b>DIY (Do-It-Yourself), Ready-to-Use Content</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
     cleaned_content = clean_ai_content(st.session_state.sample_content)
-    content_para = Paragraph(cleaned_content, styles['Normal'])
-    story.append(content_para)
 
-    # ---------- LETTER TO OWNER AT BOTTOM OF PDF ----------
+    letter_html = ""
     if st.session_state.get("owner_letter") and st.session_state.owner_letter.strip():
-        story.append(Spacer(1, 0.3*inch))
-        letter_style = ParagraphStyle(
-            'OwnerLetter',
-            parent=styles['Normal'],
-            fontSize=11,
-            leading=14,
-            spaceAfter=6,
-            textColor=colors.black
-        )
-        story.append(Paragraph("<b>Letter to the Business Owner</b>", ParagraphStyle('LetterHead', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
-        story.append(Spacer(1, 0.1*inch))
-        # Preserve line breaks
-        letter_text = st.session_state.owner_letter.replace("\n", "<br/>")
-        story.append(Paragraph(letter_text, letter_style))
+        letter_html = f"""
+        <h2 style="color:{GOOGLE_BLUE};">Letter to the Business Owner</h2>
+        <p>{st.session_state.owner_letter.replace(chr(10), '<br/>')}</p>
+        """
 
-    doc.build(story)
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            @page {{ size: letter; margin: 0.5in; }}
+            body {{
+                font-family: "DejaVu Sans", "Noto Sans", "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+                font-size: 11pt;
+                line-height: 1.45;
+                color: #222;
+            }}
+            h1, h2 {{ color: {GOOGLE_BLUE}; text-align: center; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 14px 0; }}
+            th {{ background: {GOOGLE_BLUE}; color: white; padding: 7px; text-align: left; }}
+            td {{ border: 0.5px solid #ccc; padding: 6px; vertical-align: top; background: #f8f8f8; }}
+            .center {{ text-align: center; }}
+            .emoji {{ font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }}
+        </style>
+    </head>
+    <body>
+        <h1>Local Visibility Report for<br><b>{business_name}</b></h1>
+        <p class="center"><b>This report was prepared by Jaguar Group LLC on {datetime.now().strftime("%B %d, %Y")}.</b></p>
+
+        <h2>Google Maps Profile Report Card</h2>
+        {progress_svg}
+        <p class="center"><b>{statement}</b></p>
+
+        <table>
+            <tr><th>Google Maps Report Card</th><th>Test Results</th></tr>
+            {''.join(f'<tr><td>{q}</td><td class="center">{r}</td></tr>' for q, r in st.session_state.report_card.items())}
+        </table>
+
+        <h2 style="color:{GOOGLE_RED};">HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</h2>
+        <p>
+        1. Open Google Maps on your smartphone, tablet, or computer.<br/>
+        2. Search for your business name and tap or click on it.<br/>
+        3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
+        4. If asked, sign in with the Google account that owns the business.<br/>
+        5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change.<br/>
+        6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
+        7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
+        8. Add any suggested categories if the option is available.<br/>
+        9. Upload photos based on the photo ideas.<br/>
+        10. When customers leave reviews, use the sample replies as a guide.
+        </p>
+
+        <h2 style="color:{GOOGLE_GREEN};">Report Card Summary</h2>
+        <table>
+            <tr><th>Field</th><th>Value</th></tr>
+            <tr><td>Business</td><td>{business_name}</td></tr>
+            <tr><td>Keyword</td><td>{keyword}</td></tr>
+            <tr><td>Location</td><td>{location_input}</td></tr>
+            <tr><td>Visibility Score</td><td>{st.session_state.visibility_score}%</td></tr>
+            <tr><td>Found in Top Results</td><td>{"Yes" if st.session_state.target_found else "No"}</td></tr>
+            <tr><td>Position</td><td>{st.session_state.target_position or "Not in top results"}</td></tr>
+        </table>
+
+        <h2 style="color:{GOOGLE_YELLOW};">Business Details (NAP: Name, Address, Phone Number)</h2>
+        <p>{st.session_state.auto_nap.replace(chr(10), "<br/>")}</p>
+
+        <h2 style="color:{GOOGLE_RED};">Top Local Results (NAP Verified Only)</h2>
+        <table>
+            <tr><th>Pos</th><th>Title</th><th>Rating</th><th>Reviews</th><th>Address</th><th>Phone</th></tr>
+            {results_rows}
+        </table>
+
+        <h2 style="color:{GOOGLE_GREEN};">Top Competitors</h2>
+        <p>{st.session_state.competitors.replace(chr(10), "<br/>")}</p>
+
+        <h2 style="color:{GOOGLE_BLUE};">DIY (Do-It-Yourself), Ready-to-Use Content</h2>
+        <div class="emoji">{cleaned_content}</div>
+
+        {letter_html}
+    </body>
+    </html>
+    """
+
+    HTML(string=html).write_pdf(buffer)
     buffer.seek(0)
     return buffer
 
+# ---------- RESULTS DISPLAY + NAP WARNING ----------
 if st.session_state.results_ready and st.session_state.df is not None:
+    # NAP verification check
+    nap_verified = bool(
+        business_name
+        and st.session_state.get("target_address")
+        and st.session_state.get("target_phone")
+        and str(st.session_state.target_address).strip() not in ("", "N/A")
+        and str(st.session_state.target_phone).strip() not in ("", "N/A")
+    )
+
+    if not nap_verified:
+        st.markdown(
+            """
+            <div id="nap-warning" style="
+                position: fixed;
+                top: 0; left: 0; right: 0;
+                background: #ff0000;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                text-align: center;
+                padding: 14px;
+                z-index: 9999;
+                animation: blink 0.6s linear infinite;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            ">
+                ⚠️ NOT NAP VERIFIED ⚠️
+            </div>
+            <style>
+                @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.15; }
+                }
+            </style>
+            <script>
+                setTimeout(function() {
+                    var el = document.getElementById('nap-warning');
+                    if (el) el.style.display = 'none';
+                }, 30000);
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
-    st.subheader("Top Local Results")
+    st.subheader("Top Local Results (NAP Verified Only)")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_found and st.session_state.target_lat:
