@@ -280,26 +280,33 @@ Write everything in simple, everyday language. Use short sentences.
 Create these sections:
 
 1. ACTION PLAN
+
 5-7 easy steps the owner can take.
 
 2. NEW BUSINESS DESCRIPTION
+
 A short description (under 750 characters) they can copy and paste into their Google Business Profile.
 
 3. THREE READY-TO-POST UPDATES
+
 Create three short posts that are timely for the current season ({current_season}). 
 Make them relevant to seasonal changes, weather, or customer needs right now. 
 Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
 
 4. SUGGESTED CATEGORIES
+
 Primary category and a few extra ones to add.
 
 5. PHOTO IDEAS
+
 5 simple photo ideas.
 
 6. HOW TO REPLY TO REVIEWS
+
 One sample reply for a good review and one for a so-so review.
 
 7. EXTRA KEYWORDS
+
 A few related words or phrases they should use.
 
 Keep it friendly and easy to follow. Do not invent facts about the business."""
