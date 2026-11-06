@@ -59,7 +59,6 @@ def get_current_season():
         return "Fall"
 
 def clean_ai_content(text):
-    """Clean AI content while preserving icons under post headings."""
     if not text:
         return ""
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
@@ -85,7 +84,7 @@ def clean_ai_content(text):
         elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
             cleaned_lines.append(line)
         elif re.match(r'^\d+\.\s+', stripped) and not any(x in stripped.lower() for x in ['post ', 'fall', 'clean-up', 'winter', 'spring', 'summer']):
-            cleaned_lines.append('★ ' + re.sub(r'^\d+\.\s+', '', stripped))
+            cleaned_lines.append(re.sub(r'^\d+\.\s+', '', stripped))
         else:
             cleaned_lines.append(line)
     text = '\n'.join(cleaned_lines)
@@ -118,7 +117,6 @@ if "results_ready" not in st.session_state:
     st.session_state.report_card = {}
     st.session_state.owner_letter = ""
 
-# ---------- REPORT CARD QUESTIONS ----------
 st.subheader("Google Maps Profile Report Card")
 st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
 
@@ -143,7 +141,6 @@ for i, q in enumerate(questions):
 
 st.session_state.report_card = report_card
 
-# ---------- EDITABLE LETTER TO OWNER (appears at bottom of PDF) ----------
 st.subheader("Letter to Business Owner")
 st.caption("Type or paste a personal letter. It will appear at the bottom of the downloaded Report Card PDF.")
 owner_letter = st.text_area(
@@ -179,7 +176,6 @@ else:
 st.metric("Current Report Card Score", f"{score} out of 100", help=f"Border color: {color_name}")
 st.info(statement)
 
-# ---------- MAIN AUDIT FORM ----------
 col1, col2 = st.columns(2)
 with col1:
     business_name = st.text_input("Target Business Name", placeholder="e.g. C&L Landscape")
@@ -221,12 +217,13 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         gps = item.get("gps_coordinates", {}) or {}
                         phone = item.get("phone") or item.get("phone_number") or ""
                         title = item.get("title") or ""
+                        address = item.get("address") or ""
                         rows.append({
                             "Position": item.get("position"),
                             "Title": title,
                             "Rating": item.get("rating"),
                             "Reviews": item.get("reviews"),
-                            "Address": item.get("address"),
+                            "Address": address,
                             "Phone": phone,
                             "Latitude": gps.get("latitude"),
                             "Longitude": gps.get("longitude"),
@@ -234,7 +231,7 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         if norm_target and norm_target in normalize(title):
                             target_lat = gps.get("latitude")
                             target_lon = gps.get("longitude")
-                            target_address = item.get("address") or ""
+                            target_address = address
                             target_phone = phone
 
                     if business_address.strip():
@@ -243,6 +240,15 @@ if st.button("Run Audit", type="primary", disabled=not (serpapi_key and openai_k
                         target_phone = business_phone.strip()
 
                     df = pd.DataFrame(rows[:5])
+
+                    # Only keep NAP-verified businesses
+                    if not df.empty:
+                        df = df[
+                            df["Address"].notna() & df["Phone"].notna()
+                            & (df["Address"].astype(str).str.strip() != "")
+                            & (df["Phone"].astype(str).str.strip() != "")
+                        ]
+
                     target_found = any(norm_target in normalize(str(r.get("title") or "")) for r in main_local)
                     target_position = next(
                         (r.get("position") for r in main_local
@@ -283,7 +289,6 @@ A short description (under 750 characters) they can copy and paste into their Go
 Create three short posts that are timely for the current season ({current_season}). 
 Make them relevant to seasonal changes, weather, or customer needs right now. 
 Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
-You may include simple icons or emojis under each post if they help the owner.
 
 4. SUGGESTED CATEGORIES
 Primary category and a few extra ones to add.
@@ -455,7 +460,7 @@ def create_pdf_report():
     story.append(Spacer(1, 0.15*inch))
 
     if st.session_state.df is not None and not st.session_state.df.empty:
-        story.append(Paragraph("<b>Top Local Results</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
+        story.append(Paragraph("<b>Top Local Results (NAP Verified Only)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
         cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
@@ -511,7 +516,6 @@ def create_pdf_report():
     content_para = Paragraph(cleaned_content, styles['Normal'])
     story.append(content_para)
 
-    # ---------- LETTER TO OWNER AT BOTTOM OF PDF ----------
     if st.session_state.get("owner_letter") and st.session_state.owner_letter.strip():
         story.append(Spacer(1, 0.3*inch))
         letter_style = ParagraphStyle(
@@ -524,7 +528,6 @@ def create_pdf_report():
         )
         story.append(Paragraph("<b>Letter to the Business Owner</b>", ParagraphStyle('LetterHead', parent=styles['Heading2'], textColor=GOOGLE_BLUE)))
         story.append(Spacer(1, 0.1*inch))
-        # Preserve line breaks
         letter_text = st.session_state.owner_letter.replace("\n", "<br/>")
         story.append(Paragraph(letter_text, letter_style))
 
@@ -533,8 +536,51 @@ def create_pdf_report():
     return buffer
 
 if st.session_state.results_ready and st.session_state.df is not None:
+    # NAP verification check for the target business
+    nap_verified = bool(
+        business_name
+        and st.session_state.get("target_address")
+        and st.session_state.get("target_phone")
+        and str(st.session_state.target_address).strip() not in ("", "N/A")
+        and str(st.session_state.target_phone).strip() not in ("", "N/A")
+    )
+
+    if not nap_verified:
+        st.markdown(
+            """
+            <div id="nap-warning" style="
+                position: fixed;
+                top: 0; left: 0; right: 0;
+                background: #ff0000;
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                text-align: center;
+                padding: 14px;
+                z-index: 9999;
+                animation: blink 0.6s linear infinite;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            ">
+                NOT NAP VERIFIED
+            </div>
+            <style>
+                @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.15; }
+                }
+            </style>
+            <script>
+                setTimeout(function() {
+                    var el = document.getElementById('nap-warning');
+                    if (el) el.style.display = 'none';
+                }, 30000);
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.metric("Visibility Score", f"{st.session_state.visibility_score}%")
-    st.subheader("Top Local Results")
+    st.subheader("Top Local Results (NAP Verified Only)")
     st.dataframe(st.session_state.df, use_container_width=True)
 
     if st.session_state.target_found and st.session_state.target_lat:
