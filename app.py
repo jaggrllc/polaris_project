@@ -121,15 +121,15 @@ st.subheader("Google Maps Profile Report Card")
 st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
 
 questions = [
-    "1. Is the business' NAP (name, address, and phone number) correctly listed?",
-    "2. Does the primary category match the main service?",
-    "3. Are the business's opening hours listed on their Google Maps profile?",
-    "4. Are the business's VERIFIED NAP and Google Maps Pin aligned correctly?",
-    "5. Are the business's services listed on their Google Maps profile?",
-    "6. Is the 'Response from the owner' appearing to respond to reviews?",
-    "7. Does the business have an active website listed?",
-    "8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
-    "9. Does the business's VERIFIED NAP match the contact info on their website?",
+    "&nbsp;1. Is the business' NAP (name, address, and phone number) correctly listed?",
+    "&nbsp;2. Does the primary category match the main service?",
+    "&nbsp;3. Are the business's opening hours listed on their Google Maps profile?",
+    "&nbsp;4. Are the business's VERIFIED NAP and Google Maps Pin aligned correctly?",
+    "&nbsp;5. Are the business's services listed on their Google Maps profile?",
+    "&nbsp;6. Is the 'Response from the owner' appearing to respond to reviews?",
+    "&nbsp;7. Does the business have an active website listed?",
+    "&nbsp;8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
+    "&nbsp;9. Does the business's VERIFIED NAP match the contact info on their website?",
     "10. Are there any duplicate business listings for the same business?",
 ]
 
@@ -424,15 +424,15 @@ def create_pdf_report():
     guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
-     1. Open Google Maps on your smartphone, tablet, or computer.<br/>
-     2. Search for your business name and tap or click on it.<br/>
-     3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
-     4. If asked, sign in with the Google account that owns the business.<br/>
-     5. In your Google Business Profile, edit the sections you want to change.<br/>
-     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-     7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
-     8. Add any suggested categories if the option is available.<br/>
-     9. Upload photos based on the photo ideas.<br/>
+     &nbsp;1. Open Google Maps on your smartphone, tablet, or computer.<br/>
+     &nbsp;2. Search for your business name and tap or click on it.<br/>
+     &nbsp;3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
+     &nbsp;4. If asked, sign in with the Google account that owns the business.<br/>
+     &nbsp;5. In your Google Business Profile, edit the sections you want to change.<br/>
+     &nbsp;6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
+     &nbsp;7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
+     &nbsp;8. Add any suggested categories if the option is available.<br/>
+     &nbsp;9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
     """
     story.append(Paragraph(guide_text, styles['Normal']))
