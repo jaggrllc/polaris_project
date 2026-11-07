@@ -424,15 +424,15 @@ def create_pdf_report():
     guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
-    1. Open Google Maps on your smartphone, tablet, or computer.<br/>
-    2. Search for your business name and tap or click on it.<br/>
-    3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
-    4. If asked, sign in with the Google account that owns the business.<br/>
-    5. In your Google Business Profile, edit the sections you want to change.<br/>
-    6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-    7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
-    8. Add any suggested categories if the option is available.<br/>
-    9. Upload photos based on the photo ideas.<br/>
+     1. Open Google Maps on your smartphone, tablet, or computer.<br/>
+     2. Search for your business name and tap or click on it.<br/>
+     3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
+     4. If asked, sign in with the Google account that owns the business.<br/>
+     5. In your Google Business Profile, edit the sections you want to change.<br/>
+     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
+     7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
+     8. Add any suggested categories if the option is available.<br/>
+     9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
     """
     story.append(Paragraph(guide_text, styles['Normal']))
