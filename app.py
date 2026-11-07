@@ -144,7 +144,7 @@ st.session_state.report_card = report_card
 st.subheader("Letter to Business Owner")
 st.caption("Type or paste a personal letter. It will appear at the bottom of the downloaded Report Card PDF.")
 owner_letter = st.text_area(
-    "Letter to the business owner",
+    "Letter from Jaguar Group LLC",
     value=st.session_state.owner_letter,
     height=220,
     placeholder="Dear [Business Owner],\n\nThank you for the opportunity to review your Google Maps profile...\n\nBest regards,\nJaguar Group LLC",
