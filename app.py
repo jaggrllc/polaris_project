@@ -11,7 +11,7 @@ import re
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER
@@ -121,15 +121,15 @@ st.subheader("Google Maps Profile Report Card")
 st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
 
 questions = [
-    "&nbsp;1. Is the business' NAP (name, address, and phone number) correctly listed?",
-    "&nbsp;2. Does the primary category match the main service?",
-    "&nbsp;3. Are the business's opening hours listed on their Google Maps profile?",
-    "&nbsp;4. Are the business's VERIFIED NAP and Google Maps Pin aligned correctly?",
-    "&nbsp;5. Are the business's services listed on their Google Maps profile?",
-    "&nbsp;6. Is the 'Response from the owner' appearing to respond to reviews?",
-    "&nbsp;7. Does the business have an active website listed?",
-    "&nbsp;8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
-    "&nbsp;9. Does the business's VERIFIED NAP match the contact info on their website?",
+    "1. Is the business details (VERIFIED NAP: name, address, and phone number) correctly listed?",
+    "2. Does the primary category match the main service?",
+    "3. Are the business's opening hours listed on their Google Maps profile?",
+    "4. Is the business's VERIFIED NAP and Google Maps Pin aligned in the right place?",
+    "5. Are the business's services listed on their Google Maps profile?",
+    "6. Is the 'Response from the owner' appearing to respond to reviews?",
+    "7. Does the business have an active website listed?",
+    "8. Does the business have at least 10 positive reviews on Google, Yelp, etc?",
+    "9. Does the business's VERIFIED NAP match the contact information on their website?",
     "10. Are there any duplicate business listings for the same business?",
 ]
 
@@ -144,7 +144,7 @@ st.session_state.report_card = report_card
 st.subheader("Letter to Business Owner")
 st.caption("Type or paste a personal letter. It will appear at the bottom of the downloaded Report Card PDF.")
 owner_letter = st.text_area(
-    "Letter from Jaguar Group LLC",
+    "Letter to the business owner",
     value=st.session_state.owner_letter,
     height=220,
     placeholder="Dear [Business Owner],\n\nThank you for the opportunity to review your Google Maps profile...\n\nBest regards,\nJaguar Group LLC",
@@ -280,33 +280,26 @@ Write everything in simple, everyday language. Use short sentences.
 Create these sections:
 
 1. ACTION PLAN
-
-1-7 easy steps the owner can take.
+5-7 easy steps the owner can take.
 
 2. NEW BUSINESS DESCRIPTION
-
 A short description (under 750 characters) they can copy and paste into their Google Business Profile.
 
 3. THREE READY-TO-POST UPDATES
-
 Create three short posts that are timely for the current season ({current_season}). 
 Make them relevant to seasonal changes, weather, or customer needs right now. 
 Label them clearly (Post 1, Post 2, Post 3) and include a call to action in each.
 
 4. SUGGESTED CATEGORIES
-
 Primary category and a few extra ones to add.
 
 5. PHOTO IDEAS
-
 5 simple photo ideas.
 
 6. HOW TO REPLY TO REVIEWS
-
 One sample reply for a good review and one for a so-so review.
 
 7. EXTRA KEYWORDS
-
 A few related words or phrases they should use.
 
 Keep it friendly and easy to follow. Do not invent facts about the business."""
@@ -424,19 +417,22 @@ def create_pdf_report():
     guide_style = ParagraphStyle('Guide', parent=styles['Normal'], textColor=GOOGLE_RED, fontSize=11, leading=14, spaceAfter=6)
     story.append(Paragraph("<b>HOW TO OPTIMIZE YOUR GOOGLE BUSINESS PROFILE</b>", guide_style))
     guide_text = """
-     &nbsp;1. Open Google Maps on your smartphone, tablet, or computer.<br/>
-     &nbsp;2. Search for your business name and tap or click on it.<br/>
-     &nbsp;3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
-     &nbsp;4. If asked, sign in with the Google account that owns the business.<br/>
-     &nbsp;5. In your Google Business Profile, edit the sections you want to change.<br/>
-     &nbsp;6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-     &nbsp;7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
-     &nbsp;8. Add any suggested categories if the option is available.<br/>
-     &nbsp;9. Upload photos based on the photo ideas.<br/>
+    1. Open Google Maps on your smartphone, tablet, or computer.<br/>
+    2. Search for your business name and tap or click on it.<br/>
+    3. Look for the “Edit profile” button (or “Manage this business”) and tap/click it.<br/>
+    4. If asked, sign in with the Google account that owns the business.<br/>
+    5. Once inside your Google Business Profile, click or tap “Edit” next to the section you want to change (Description, Categories, etc.).<br/>
+    6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
+    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
+    8. Add any suggested categories if the option is available.<br/>
+    9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
     """
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
+
+    # Force page break so content after this starts on page 2
+    story.append(PageBreak())
 
     summary_data = [
         ["Field", "Value"],
@@ -466,9 +462,9 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
+    # Force page break so "Top Local Results" starts at the top of page 3
+    story.append(PageBreak())
 
-
-    
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top Local Results (NAP Verified Only)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
@@ -596,4 +592,5 @@ if st.session_state.results_ready and st.session_state.df is not None:
         file_name=f"{business_name.replace(' ', '_')}_Report.pdf",
         mime="application/pdf"
     )
+
 st.sidebar.info("Editable letter box added under the 10 questions. The letter appears at the bottom of the PDF.")
