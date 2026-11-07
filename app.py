@@ -103,7 +103,7 @@ def clean_ai_content(text):
         stripped = re.sub(r'^\d+[\.\)\-\s]+', '', stripped)
 
         if re.match(r'^EXTRA KEYWORDS', stripped, re.I):
-            cleaned_lines.append("EXTRA KEYWORDS:")
+            cleaned_lines.append("EXTRA KEYWORDS")
             in_extra_keywords = True
             extra_keywords_list = []
             continue
