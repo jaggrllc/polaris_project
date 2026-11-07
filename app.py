@@ -1,6 +1,3 @@
-Here is the updated script. The `clean_ai_content` function has been modified so that no paragraph under the **DIY (Do-It-Yourself), Ready-to-Use Content** section (including the ACTION PLAN items) starts with a number.
-
-```python
 import streamlit as st
 import pandas as pd
 import serpapi
