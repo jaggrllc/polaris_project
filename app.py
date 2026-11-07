@@ -61,6 +61,23 @@ def get_current_season():
 def clean_ai_content(text):
     if not text:
         return ""
+
+    # Remove all emojis
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags
+        "\U00002700-\U000027BF"  # dingbats
+        "\U0001F900-\U0001F9FF"  # supplemental symbols
+        "\U00002600-\U000026FF"  # misc symbols
+        "\U0001FA70-\U0001FAFF"  # symbols & pictographs extended
+        "]+",
+        flags=re.UNICODE
+    )
+    text = emoji_pattern.sub('', text)
+
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
     text = re.sub(r'#+\s*', '', text)
     text = re.sub(r'(?i)^h[1-6]\.?\s*', '', text, flags=re.MULTILINE)
@@ -80,9 +97,8 @@ def clean_ai_content(text):
     cleaned_lines = []
     for line in lines:
         stripped = line.strip()
-        # Remove leading numbers (e.g. "1. ", "2) ", "3 - ") from any line
+        # Remove leading numbers
         stripped = re.sub(r'^\d+[\.\)\-\s]+', '', stripped)
-        # Also clean any remaining numbered list patterns
         if re.match(r'^(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
             cleaned_lines.append(stripped)
         elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
