@@ -11,7 +11,7 @@ import re
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER
@@ -431,9 +431,6 @@ def create_pdf_report():
     story.append(Paragraph(guide_text, styles['Normal']))
     story.append(Spacer(1, 0.2*inch))
 
-    # Force page break so content after this starts on page 2
-    story.append(PageBreak())
-
     summary_data = [
         ["Field", "Value"],
         ["Business", business_name],
@@ -462,8 +459,19 @@ def create_pdf_report():
     story.append(Paragraph(st.session_state.auto_nap.replace("\n", "<br/>"), styles['Normal']))
     story.append(Spacer(1, 0.15*inch))
 
-    # Force page break so "Top Local Results" starts at the top of page 3
-    story.append(PageBreak())
+    # 500-word article on the importance of NAP
+    nap_article = """
+    <b>Why Accurate Business Details (NAP) Are Essential for Every Local Business</b><br/><br/>
+    For any local business, the combination of Name, Address, and Phone number—commonly called NAP—is the foundation of online visibility and customer trust. When these three pieces of information are complete, consistent, and correctly listed across the internet, search engines and potential customers can easily find and contact the business. When they are missing, incomplete, or inconsistent, the business becomes harder to discover and less trustworthy.<br/><br/>
+    Google and other search engines use NAP as a primary signal to verify that a business is real and to determine where it should appear in local search results and on Google Maps. A complete and accurate NAP helps the business rank higher when people search for services nearby. If the phone number is missing or the address is incomplete, Google may treat the listing as less reliable and reduce its visibility in the local pack and map results. This means fewer people will see the business when they are actively looking for the services it offers.<br/><br/>
+    Consistency matters just as much as completeness. The exact same business name, street address, and phone number should appear on the Google Business Profile, the company website, directories such as Yelp and Apple Maps, and social media profiles. Even small differences—such as “Street” versus “St.” or an old phone number—can confuse search engines and create duplicate listings. Duplicate or conflicting information weakens the business’s local ranking power and can cause customers to call the wrong number or visit the wrong location.<br/><br/>
+    From the customer’s perspective, clear NAP information builds immediate confidence. When someone finds a business online, the first things they check are the address and phone number. A complete listing makes it easy for them to call, get directions, or visit. Missing or incorrect details create friction and doubt. Many customers simply move on to a competitor whose contact information is clear and reliable. In local service industries, this lost opportunity can mean lost revenue every day.<br/><br/>
+    Accurate NAP also supports other important marketing activities. Online reviews are tied to the correct business listing only when the NAP is consistent. Driving directions and “near me” searches depend on a precise address. Call tracking, appointment systems, and local advertising campaigns all perform better when the core business details are correct and uniform. Over time, consistent NAP becomes a trust signal that strengthens the business’s overall digital presence.<br/><br/>
+    Business owners should treat their NAP as a critical asset that needs regular attention. Verify that the Google Business Profile shows the exact legal or commonly used business name, the full street address (including suite or unit number when applicable), and a working local phone number. Then check that the same information appears on the website contact page and major directories. Correcting inconsistencies and filling in missing details is one of the highest-impact, lowest-cost actions a local business can take to improve visibility and attract more customers.<br/><br/>
+    In short, complete and consistent Business Details (NAP) are not optional. They are the foundation that allows search engines to recommend the business and allows customers to reach it with confidence. Listing accurate Name, Address, and Phone information is one of the most important steps any local business owner can take to grow.
+    """
+    story.append(Paragraph(nap_article, styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
 
     if st.session_state.df is not None and not st.session_state.df.empty:
         story.append(Paragraph("<b>Top Local Results (NAP Verified Only)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
