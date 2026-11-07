@@ -467,7 +467,7 @@ def create_pdf_report():
     story.append(Spacer(1, 0.15*inch))
 
     if st.session_state.df is not None and not st.session_state.df.empty:
-        story.append(Paragraph("<br><br><br><b>Top Local Results (NAP Verified Only)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
+        story.append(Paragraph("<b>Top Local Results (NAP Verified Only)</b>", ParagraphStyle('H2', parent=styles['Heading2'], textColor=GOOGLE_RED)))
         header = ["Pos", "Title", "Rating", "Reviews", "Address", "Phone"]
         table_data = [header]
         cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
