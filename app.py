@@ -430,7 +430,7 @@ def create_pdf_report():
     4. If asked, sign in with the Google account that owns the business.<br/>
     5. In your Google Business Profile, edit the sections you want to change.<br/>
     6. Copy the New Business Description from this report and paste it into the description box, then save.<br/>
-    7. To add a post: look for “Add update” or “Create post”, copy one of the three posts below, and paste it.<br/>
+    7. Next, tap/click “Add update” or “Create post” to copy and paste one or all three posts below.<br/>
     8. Add any suggested categories if the option is available.<br/>
     9. Upload photos based on the photo ideas.<br/>
     10. When customers leave reviews, use the sample replies as a guide.
