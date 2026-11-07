@@ -65,14 +65,14 @@ def clean_ai_content(text):
     # Remove all emojis
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F1E0-\U0001F1FF"  # flags
-        "\U00002700-\U000027BF"  # dingbats
-        "\U0001F900-\U0001F9FF"  # supplemental symbols
-        "\U00002600-\U000026FF"  # misc symbols
-        "\U0001FA70-\U0001FAFF"  # symbols & pictographs extended
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002700-\U000027BF"
+        "\U0001F900-\U0001F9FF"
+        "\U00002600-\U000026FF"
+        "\U0001FA70-\U0001FAFF"
         "]+",
         flags=re.UNICODE
     )
@@ -95,16 +95,45 @@ def clean_ai_content(text):
 
     lines = text.split('\n')
     cleaned_lines = []
+    in_extra_keywords = False
+    extra_keywords_list = []
+
     for line in lines:
         stripped = line.strip()
-        # Remove leading numbers
         stripped = re.sub(r'^\d+[\.\)\-\s]+', '', stripped)
+
+        if re.match(r'^EXTRA KEYWORDS', stripped, re.I):
+            cleaned_lines.append("EXTRA KEYWORDS:")
+            in_extra_keywords = True
+            extra_keywords_list = []
+            continue
+
+        if in_extra_keywords:
+            if not stripped:
+                continue
+            # Collect keywords until next major heading
+            if re.match(r'^(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS)', stripped, re.I):
+                if extra_keywords_list:
+                    cleaned_lines.append(", ".join(extra_keywords_list))
+                in_extra_keywords = False
+                cleaned_lines.append(stripped)
+            else:
+                # Clean and collect keyword
+                kw = re.sub(r'^[•\-\*\s]+', '', stripped).strip()
+                if kw:
+                    extra_keywords_list.append(kw)
+            continue
+
         if re.match(r'^(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
             cleaned_lines.append(stripped)
         elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
             cleaned_lines.append(stripped)
         else:
             cleaned_lines.append(stripped)
+
+    # If EXTRA KEYWORDS was the last section
+    if in_extra_keywords and extra_keywords_list:
+        cleaned_lines.append(", ".join(extra_keywords_list))
 
     text = '\n'.join(cleaned_lines)
     text = text.replace('**', '').replace('###', '')
