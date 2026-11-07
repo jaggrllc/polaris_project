@@ -1,3 +1,6 @@
+Here is the updated script. The `clean_ai_content` function has been modified so that no paragraph under the **DIY (Do-It-Yourself), Ready-to-Use Content** section (including the ACTION PLAN items) starts with a number.
+
+```python
 import streamlit as st
 import pandas as pd
 import serpapi
@@ -65,28 +68,31 @@ def clean_ai_content(text):
     text = re.sub(r'#+\s*', '', text)
     text = re.sub(r'(?i)^h[1-6]\.?\s*', '', text, flags=re.MULTILINE)
     replacements = {
-        r'(?i)1\.?\s*ACTION PLAN': '1. ACTION PLAN',
-        r'(?i)2\.?\s*NEW BUSINESS DESCRIPTION': '2. NEW BUSINESS DESCRIPTION',
-        r'(?i)3\.?\s*THREE READY-TO-POST UPDATES': '3. THREE READY-TO-POST UPDATES',
-        r'(?i)4\.?\s*SUGGESTED CATEGORIES': '4. SUGGESTED CATEGORIES',
-        r'(?i)5\.?\s*PHOTO IDEAS': '5. PHOTO IDEAS',
-        r'(?i)6\.?\s*HOW TO REPLY TO REVIEWS': '6. HOW TO REPLY TO REVIEWS',
-        r'(?i)7\.?\s*EXTRA KEYWORDS': '7. EXTRA KEYWORDS',
+        r'(?i)1\.?\s*ACTION PLAN': 'ACTION PLAN',
+        r'(?i)2\.?\s*NEW BUSINESS DESCRIPTION': 'NEW BUSINESS DESCRIPTION',
+        r'(?i)3\.?\s*THREE READY-TO-POST UPDATES': 'THREE READY-TO-POST UPDATES',
+        r'(?i)4\.?\s*SUGGESTED CATEGORIES': 'SUGGESTED CATEGORIES',
+        r'(?i)5\.?\s*PHOTO IDEAS': 'PHOTO IDEAS',
+        r'(?i)6\.?\s*HOW TO REPLY TO REVIEWS': 'HOW TO REPLY TO REVIEWS',
+        r'(?i)7\.?\s*EXTRA KEYWORDS': 'EXTRA KEYWORDS',
     }
     for pattern, replacement in replacements.items():
         text = re.sub(pattern, replacement, text)
+
     lines = text.split('\n')
     cleaned_lines = []
     for line in lines:
         stripped = line.strip()
-        if re.match(r'^[1-7]\.\s+(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
+        # Remove leading numbers (e.g. "1. ", "2) ", "3 - ") from any line
+        stripped = re.sub(r'^\d+[\.\)\-\s]+', '', stripped)
+        # Also clean any remaining numbered list patterns
+        if re.match(r'^(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS|EXTRA KEYWORDS)', stripped, re.I):
             cleaned_lines.append(stripped)
         elif re.match(r'(?i)Post\s*[123]\s*:', stripped) or 'Fall Clean-Up' in stripped or 'Clean-Up' in stripped:
-            cleaned_lines.append(line)
-        elif re.match(r'^\d+\.\s+', stripped) and not any(x in stripped.lower() for x in ['post ', 'fall', 'clean-up', 'winter', 'spring', 'summer']):
-            cleaned_lines.append(re.sub(r'^\d+\.\s+', '', stripped))
+            cleaned_lines.append(stripped)
         else:
-            cleaned_lines.append(line)
+            cleaned_lines.append(stripped)
+
     text = '\n'.join(cleaned_lines)
     text = text.replace('**', '').replace('###', '')
     text = text.replace('\n', '<br/>')
