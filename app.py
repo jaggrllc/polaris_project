@@ -396,10 +396,10 @@ def create_circular_progress(score, bar_color):
     d = Drawing(size, size)
     d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
     d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    # Add "SCORE:" above the number
-    d.add(String(center, center + 55, "SCORE:", fontSize=36, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(center, center + 5, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(center, center - 65, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
+    # "SCORE:" sits directly over the top half of the grade number
+    d.add(String(center, center + 28, "SCORE:", fontSize=32, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(center, center - 15, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(center, center - 75, "out of 100", fontSize=26, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
 
 def create_pdf_report():
