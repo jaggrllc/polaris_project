@@ -166,7 +166,7 @@ st.subheader("Google Maps Profile Report Card")
 st.caption("Tick PASS or FAIL for each item. Score = number of PASS answers × 10.")
 
 questions = [
-    "1. Is the business details (VERIFIED NAP: name, address, and phone number) correctly listed?",
+    "1. Is the business NAP (name, address, and phone number) correctly listed?",
     "2. Does the primary category match the main service?",
     "3. Are the business's opening hours listed on their Google Maps profile?",
     "4. Is the business's VERIFIED NAP and Google Maps Pin aligned correctly?",
