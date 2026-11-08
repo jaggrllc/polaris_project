@@ -103,7 +103,7 @@ def clean_ai_content(text):
         stripped = re.sub(r'^\d+[\.\)\-\s]+', '', stripped)
 
         if re.match(r'^EXTRA KEYWORDS', stripped, re.I):
-            cleaned_lines.append("EXTRA KEYWORDS")
+            cleaned_lines.append("EXTRA KEYWORDS:")
             in_extra_keywords = True
             extra_keywords_list = []
             continue
@@ -111,14 +111,12 @@ def clean_ai_content(text):
         if in_extra_keywords:
             if not stripped:
                 continue
-            # Collect keywords until next major heading
             if re.match(r'^(ACTION PLAN|NEW BUSINESS DESCRIPTION|THREE READY-TO-POST UPDATES|SUGGESTED CATEGORIES|PHOTO IDEAS|HOW TO REPLY TO REVIEWS)', stripped, re.I):
                 if extra_keywords_list:
                     cleaned_lines.append(", ".join(extra_keywords_list))
                 in_extra_keywords = False
                 cleaned_lines.append(stripped)
             else:
-                # Clean and collect keyword
                 kw = re.sub(r'^[•\-\*\s]+', '', stripped).strip()
                 if kw:
                     extra_keywords_list.append(kw)
@@ -131,7 +129,6 @@ def clean_ai_content(text):
         else:
             cleaned_lines.append(stripped)
 
-    # If EXTRA KEYWORDS was the last section
     if in_extra_keywords and extra_keywords_list:
         cleaned_lines.append(", ".join(extra_keywords_list))
 
@@ -399,8 +396,10 @@ def create_circular_progress(score, bar_color):
     d = Drawing(size, size)
     d.add(Circle(center, center, radius, strokeColor=bar_color, strokeWidth=stroke, fillColor=colors.white))
     d.add(Circle(center, center, radius - 55, strokeColor=colors.white, fillColor=colors.white))
-    d.add(String(center, center + 15, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
-    d.add(String(center, center - 55, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
+    # Add "SCORE:" above the number
+    d.add(String(center, center + 55, "SCORE:", fontSize=36, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(center, center + 5, f"{score}", fontSize=140, fontName="Helvetica-Bold", fillColor=colors.black, textAnchor="middle"))
+    d.add(String(center, center - 65, "out of 100", fontSize=28, fontName="Helvetica", fillColor=colors.black, textAnchor="middle"))
     return d
 
 def create_pdf_report():
